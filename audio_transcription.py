@@ -1,18 +1,29 @@
 import os
 import tempfile
 import requests
-import whisper
 
 
-print("Loading Whisper model...")
-WHISPER_MODEL = whisper.load_model("base")
-print("Whisper model loaded.")
+WHISPER_MODEL = None
 
 
 def transcribe_audio_from_url(url: str) -> str:
 
+    global WHISPER_MODEL
+
     if not url:
         raise ValueError("Audio URL is missing")
+
+    # Load Whisper only when an audio message is actually received.
+    # This prevents Render from loading the model during API startup.
+    if WHISPER_MODEL is None:
+
+        import whisper
+
+        print("Loading Whisper model...")
+
+        WHISPER_MODEL = whisper.load_model("base")
+
+        print("Whisper model loaded.")
 
     print("\n========== AUDIO TRANSCRIPTION ==========")
     print("AUDIO URL:", url)
