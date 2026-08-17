@@ -7,11 +7,11 @@ API_URL = "https://aylin-ai-loan-assistant.onrender.com"
 
 
 # ============================================================
-# PAGE CONFIG
+# PAGE
 # ============================================================
 
 st.set_page_config(
-    page_title="Aylin — AI помощник",
+    page_title="Aylin — Тестирование",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -19,23 +19,19 @@ st.set_page_config(
 
 
 # ============================================================
-# SESSION STATE
+# SESSION
 # ============================================================
 
-if "phone" not in st.session_state:
-    st.session_state.phone = ""
+defaults = {
+    "phone": "",
+    "application_id": None,
+    "messages": [],
+    "page": "Диалог",
+}
 
-if "application_id" not in st.session_state:
-    st.session_state.application_id = None
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "page" not in st.session_state:
-    st.session_state.page = "Диалог"
-
-if "started" not in st.session_state:
-    st.session_state.started = False
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
 
 # ============================================================
@@ -45,23 +41,142 @@ if "started" not in st.session_state:
 def api_get(endpoint):
 
     try:
-
         response = requests.get(
             f"{API_URL}{endpoint}",
             timeout=30,
         )
 
         response.raise_for_status()
-
         return response.json()
 
-    except requests.RequestException as error:
+    except requests.RequestException:
+        return None
 
-        st.error(
-            f"Не удалось подключиться к серверу: {error}"
+    except Exception:
+        return None
+
+
+def get_customer():
+
+    if not st.session_state.phone:
+        return None
+
+    return api_get(
+        f"/applications/current/{st.session_state.phone}"
+    )
+
+
+def reset_client():
+
+    st.session_state.messages = []
+    st.session_state.application_id = None
+    st.session_state.page = "Диалог"
+
+
+# ============================================================
+# CUSTOMER CARD
+# ============================================================
+
+def show_customer_card(customer):
+
+    st.subheader("👤 Карточка клиента")
+
+    if not customer:
+
+        st.info(
+            "После первого сообщения здесь появится "
+            "информация о клиенте."
         )
 
-        return None
+        return
+
+    fields = [
+
+        ("car_model", "Модель автомобиля"),
+
+        ("car_year", "Год выпуска"),
+
+        ("car_value", "Стоимость автомобиля"),
+
+        ("loan_amount", "Сумма займа"),
+
+        ("loan_program", "Программа займа"),
+
+        ("loan_term_months", "Срок займа"),
+
+        ("vehicle_possession", "Условия хранения автомобиля"),
+
+        ("registration_region", "Регион регистрации"),
+
+        ("stage", "Этап"),
+
+    ]
+
+    for key, label in fields:
+
+        value = customer.get(key)
+
+        if value is None or value == "":
+            value = "Не указано"
+
+        if key in (
+            "car_value",
+            "loan_amount",
+        ) and value != "Не указано":
+
+            try:
+                value = (
+                    f"{float(value):,.0f}"
+                    .replace(",", " ")
+                    + " сом"
+                )
+            except Exception:
+                pass
+
+        if key == "loan_term_months" and value != "Не указано":
+
+            value = f"{value} мес."
+
+        if key == "vehicle_possession":
+
+            if value == "customer":
+                value = "Автомобиль остаётся у клиента"
+
+            elif value == "lender":
+                value = "Охраняемая стоянка"
+
+        st.markdown(
+            f"""
+            <div style="
+                padding:10px;
+                margin-bottom:6px;
+                border:1px solid #ddd;
+                border-radius:8px;
+            ">
+                <div style="font-size:13px;color:#777;">
+                    {label}
+                </div>
+                <div style="font-size:16px;font-weight:600;">
+                    {value}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    application_id = customer.get(
+        "application_id"
+    )
+
+    if application_id:
+
+        st.caption("Номер заявки")
+
+        st.code(
+            application_id
+        )
 
 
 # ============================================================
@@ -78,7 +193,7 @@ with st.sidebar:
 
     st.divider()
 
-    st.subheader("Клиент")
+    st.subheader("Тестовый клиент")
 
     phone = st.text_input(
         "Номер телефона",
@@ -90,340 +205,327 @@ with st.sidebar:
 
     st.divider()
 
+    # --------------------------------------------------------
+    # NEW CLIENT
+    # --------------------------------------------------------
+
+    if st.button(
+        "➕ Новый клиент",
+        use_container_width=True,
+        type="primary",
+    ):
+
+        reset_client()
+
+        st.rerun()
+
+    st.divider()
+
     st.subheader("Разделы")
 
     if st.button(
         "💬 Диалог",
         use_container_width=True,
     ):
+
         st.session_state.page = "Диалог"
+
         st.rerun()
 
     if st.button(
-        "📋 Текущая заявка",
+        "📋 Карточка клиента",
         use_container_width=True,
     ):
-        st.session_state.page = "Текущая заявка"
+
+        st.session_state.page = "Карточка клиента"
+
         st.rerun()
 
     if st.button(
         "📜 История диалога",
         use_container_width=True,
     ):
+
         st.session_state.page = "История диалога"
+
         st.rerun()
 
     if st.button(
         "🗂 История заявок",
         use_container_width=True,
     ):
+
         st.session_state.page = "История заявок"
+
         st.rerun()
 
     if st.button(
         "🔗 Состояние системы",
         use_container_width=True,
     ):
+
         st.session_state.page = "Состояние системы"
-        st.rerun()
-
-    st.divider()
-
-    if st.session_state.application_id:
-
-        st.subheader("Заявка")
-
-        st.write(
-            "Номер заявки:"
-        )
-
-        st.code(
-            st.session_state.application_id
-        )
-
-    st.divider()
-
-    if st.button(
-        "🗑 Начать новый диалог",
-        use_container_width=True,
-    ):
-
-        st.session_state.messages = []
-        st.session_state.application_id = None
-        st.session_state.started = False
 
         st.rerun()
 
 
 # ============================================================
-# MAIN — CONVERSATION
+# DIALOG
 # ============================================================
 
 if st.session_state.page == "Диалог":
 
-    st.title(
-        "💬 Диалог с Aylin"
-    )
+    st.title("💬 Тестирование Aylin")
 
     st.caption(
-        "Проверьте, как Aylin общается с клиентом и собирает информацию для заявки."
+        "Проверьте реальный сценарий общения с клиентом. "
+        "Карточка клиента обновляется после каждого сообщения."
     )
 
-    # --------------------------------------------------------
-    # WELCOME
-    # --------------------------------------------------------
-
-    if not st.session_state.messages:
-
-        st.info(
-            "Здравствуйте! Я Aylin — AI-помощник по оформлению займа. "
-            "Введите сообщение клиента ниже, чтобы начать диалог."
-        )
-
-        st.markdown(
-            """
-**Примеры сообщений клиента:**
-
-- «У меня Toyota Camry 2021 года, хочу получить 500000 сом»
-- «Машина стоит примерно 1500000 сом»
-- «Хочу оформить займ без изъятия автомобиля»
-- «Я нахожусь в Бишкеке»
-- «Мне нужен займ на 12 месяцев»
-"""
-        )
-
-    # --------------------------------------------------------
-    # CHAT HISTORY
-    # --------------------------------------------------------
-
-    for message in st.session_state.messages:
-
-        avatar = (
-            "👤"
-            if message["role"] == "user"
-            else "🤖"
-        )
-
-        with st.chat_message(
-            message["role"],
-            avatar=avatar,
-        ):
-
-            st.write(
-                message["content"]
-            )
-
-    # --------------------------------------------------------
-    # CHAT INPUT
-    # --------------------------------------------------------
-
-    user_message = st.chat_input(
-        "Напишите сообщение клиента..."
+    left, right = st.columns(
+        [1.55, 1]
     )
 
-    if user_message:
+    # ========================================================
+    # CHAT
+    # ========================================================
+
+    with left:
+
+        st.subheader("Диалог")
 
         if not st.session_state.phone:
 
-            st.warning(
-                "Сначала укажите номер телефона клиента слева."
+            st.info(
+                "Введите номер телефона клиента слева, "
+                "затем начните диалог."
             )
 
-            st.stop()
+        if not st.session_state.messages:
 
-        # ----------------------------------------------------
-        # CUSTOMER MESSAGE
-        # ----------------------------------------------------
+            st.markdown(
+                """
+                **Начните тестирование**
 
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": user_message,
-            }
-        )
+                Например:
 
-        with st.chat_message(
-            "user",
-            avatar="👤",
-        ):
+                > Здравствуйте, хочу получить займ под автомобиль.
 
-            st.write(
-                user_message
+                Или сразу передайте несколько данных:
+
+                > У меня Toyota Camry 2021 года, машина стоит
+                > примерно 1 500 000 сом, хочу получить
+                > 500 000 сом.
+                """
             )
 
-        payload = {
+        for message in st.session_state.messages:
 
-            "phone":
-                st.session_state.phone,
+            if message["role"] == "user":
 
-            "message":
-                user_message,
-
-            "application_id":
-                st.session_state.application_id,
-
-        }
-
-        # ----------------------------------------------------
-        # AI RESPONSE
-        # ----------------------------------------------------
-
-        with st.chat_message(
-            "assistant",
-            avatar="🤖",
-        ):
-
-            with st.spinner(
-                "Aylin анализирует сообщение..."
-            ):
-
-                try:
-
-                    response = requests.post(
-
-                        f"{API_URL}/conversation/message",
-
-                        json=payload,
-
-                        timeout=90,
-
-                    )
-
-                    response.raise_for_status()
-
-                    data = response.json()
-
-                    st.session_state.application_id = (
-
-                        data.get("application_id")
-
-                        or
-                        st.session_state.application_id
-
-                    )
-
-                    aylin_response = data.get(
-                        "response",
-                        "Извините, сейчас не удалось получить ответ.",
-                    )
-
-                    # Small delay makes the interface feel
-                    # more natural without slowing the API.
-
-                    time.sleep(0.3)
+                with st.chat_message(
+                    "user",
+                    avatar="👤",
+                ):
 
                     st.write(
-                        aylin_response
+                        message["content"]
                     )
 
-                    st.session_state.messages.append(
-                        {
-                            "role":
-                                "assistant",
+            else:
 
-                            "content":
-                                aylin_response,
-                        }
+                with st.chat_message(
+                    "assistant",
+                    avatar="🤖",
+                ):
+
+                    st.write(
+                        message["content"]
                     )
 
-                except requests.RequestException as error:
+        user_message = st.chat_input(
+            "Введите сообщение клиента..."
+        )
 
-                    st.error(
-                        "Не удалось получить ответ от Aylin. "
-                        "Попробуйте ещё раз."
-                    )
+        if user_message:
 
-                    st.caption(
-                        str(error)
-                    )
+            if not st.session_state.phone:
 
-                except Exception as error:
+                st.warning(
+                    "Сначала укажите номер телефона клиента."
+                )
 
-                    st.error(
-                        "Произошла ошибка при обработке сообщения."
-                    )
+                st.stop()
 
-                    st.caption(
-                        str(error)
-                    )
+            # ------------------------------------------------
+            # SHOW CLIENT MESSAGE
+            # ------------------------------------------------
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": user_message,
+                }
+            )
+
+            with st.chat_message(
+                "user",
+                avatar="👤",
+            ):
+
+                st.write(
+                    user_message
+                )
+
+            payload = {
+
+                "phone":
+                    st.session_state.phone,
+
+                "message":
+                    user_message,
+
+                "application_id":
+                    st.session_state.application_id,
+
+            }
+
+            # ------------------------------------------------
+            # SEND TO API
+            # ------------------------------------------------
+
+            with st.chat_message(
+                "assistant",
+                avatar="🤖",
+            ):
+
+                with st.spinner(
+                    "Aylin обрабатывает сообщение..."
+                ):
+
+                    try:
+
+                        response = requests.post(
+
+                            f"{API_URL}/conversation/message",
+
+                            json=payload,
+
+                            timeout=90,
+
+                        )
+
+                        response.raise_for_status()
+
+                        data = response.json()
+
+                        st.session_state.application_id = (
+
+                            data.get(
+                                "application_id"
+                            )
+                            or
+                            st.session_state.application_id
+                        )
+
+                        aylin_response = data.get(
+                            "response",
+                            "Не удалось получить ответ от Aylin.",
+                        )
+
+                        time.sleep(0.2)
+
+                        st.write(
+                            aylin_response
+                        )
+
+                        st.session_state.messages.append(
+                            {
+                                "role":
+                                    "assistant",
+
+                                "content":
+                                    aylin_response,
+                            }
+                        )
+
+                    except requests.RequestException as error:
+
+                        st.error(
+                            "Не удалось подключиться к Aylin API."
+                        )
+
+                        st.caption(
+                            str(error)
+                        )
+
+                    except Exception as error:
+
+                        st.error(
+                            "Произошла ошибка при обработке сообщения."
+                        )
+
+                        st.caption(
+                            str(error)
+                        )
+
+            # ------------------------------------------------
+            # REFRESH PAGE
+            # ------------------------------------------------
+
+            st.rerun()
+
+    # ========================================================
+    # CUSTOMER CARD
+    # ========================================================
+
+    with right:
+
+        customer_data = get_customer()
+
+        show_customer_card(
+            customer_data
+        )
 
 
 # ============================================================
-# CURRENT APPLICATION
+# CUSTOMER CARD PAGE
 # ============================================================
 
-elif st.session_state.page == "Текущая заявка":
+elif st.session_state.page == "Карточка клиента":
 
-    st.title(
-        "📋 Текущая заявка"
-    )
+    st.title("👤 Карточка клиента")
 
     st.caption(
-        "Информация, которую Aylin уже собрала о клиенте."
+        "Все данные, которые Aylin уже собрала."
     )
 
     if not st.session_state.phone:
 
         st.info(
-            "Укажите номер телефона клиента слева."
+            "Введите номер телефона клиента."
         )
 
     else:
 
-        data = api_get(
-            f"/applications/current/{st.session_state.phone}"
-        )
+        customer_data = get_customer()
 
-        if data:
+        if customer_data:
 
-            st.success(
-                "Заявка найдена"
-            )
-
-            customer = data.get(
+            customer = customer_data.get(
                 "customer",
-                data
+                customer_data
             )
 
-            if isinstance(customer, dict):
+            show_customer_card(
+                customer
+            )
 
-                columns = [
+        else:
 
-                    ("car_model", "Автомобиль"),
-
-                    ("car_year", "Год выпуска"),
-
-                    ("car_value", "Стоимость автомобиля"),
-
-                    ("loan_amount", "Сумма займа"),
-
-                    ("loan_program", "Программа займа"),
-
-                    ("loan_term_months", "Срок займа"),
-
-                    ("vehicle_possession", "Условия хранения автомобиля"),
-
-                    ("registration_region", "Регион регистрации"),
-
-                    ("stage", "Этап"),
-
-                ]
-
-                for key, label in columns:
-
-                    value = customer.get(key)
-
-                    if value is not None:
-
-                        st.write(
-                            f"**{label}:** {value}"
-                        )
-
-            else:
-
-                st.json(
-                    data
-                )
+            st.info(
+                "Для этого номера пока нет активной заявки."
+            )
 
 
 # ============================================================
@@ -432,38 +534,31 @@ elif st.session_state.page == "Текущая заявка":
 
 elif st.session_state.page == "История диалога":
 
-    st.title(
-        "📜 История диалога"
-    )
+    st.title("📜 История диалога")
 
-    st.caption(
-        "Предыдущие сообщения по текущей заявке."
-    )
-
-    if not st.session_state.application_id:
+    if not st.session_state.messages:
 
         st.info(
-            "Сначала начните диалог с клиентом."
+            "В текущем тестовом диалоге пока нет сообщений."
         )
 
     else:
 
-        data = api_get(
-            "/dashboard/conversation/"
-            f"{st.session_state.application_id}"
-        )
+        for message in st.session_state.messages:
 
-        if data:
+            if message["role"] == "user":
 
-            if isinstance(data, list):
-
-                for item in data:
-
-                    st.write(item)
+                st.markdown(
+                    f"**👤 Клиент:** {message['content']}"
+                )
 
             else:
 
-                st.json(data)
+                st.markdown(
+                    f"**🤖 Aylin:** {message['content']}"
+                )
+
+            st.divider()
 
 
 # ============================================================
@@ -472,18 +567,12 @@ elif st.session_state.page == "История диалога":
 
 elif st.session_state.page == "История заявок":
 
-    st.title(
-        "🗂 История заявок"
-    )
-
-    st.caption(
-        "Все предыдущие заявки клиента."
-    )
+    st.title("🗂 История заявок")
 
     if not st.session_state.phone:
 
         st.info(
-            "Укажите номер телефона клиента слева."
+            "Введите номер телефона клиента."
         )
 
     else:
@@ -492,43 +581,43 @@ elif st.session_state.page == "История заявок":
             f"/applications/history/{st.session_state.phone}"
         )
 
-        if data:
+        if not data:
 
-            count = data.get(
-                "count",
-                0
+            st.warning(
+                "Не удалось получить историю заявок."
             )
 
-            st.metric(
-                "Количество заявок",
-                count
-            )
+        else:
 
             applications = data.get(
                 "applications",
                 []
             )
 
-            if applications:
+            if not applications:
 
-                for index, application in enumerate(
-                    applications,
-                    start=1,
-                ):
+                st.info(
+                    "У клиента пока нет истории заявок."
+                )
+
+            else:
+
+                st.write(
+                    f"Количество заявок: {len(applications)}"
+                )
+
+                for application in applications:
 
                     with st.expander(
-                        f"Заявка №{index}"
+                        application.get(
+                            "application_id",
+                            "Заявка"
+                        )
                     ):
 
                         st.json(
                             application
                         )
-
-            else:
-
-                st.info(
-                    "У клиента пока нет предыдущих заявок."
-                )
 
 
 # ============================================================
@@ -537,39 +626,46 @@ elif st.session_state.page == "История заявок":
 
 elif st.session_state.page == "Состояние системы":
 
-    st.title(
-        "🔗 Состояние системы"
+    st.title("🔗 Состояние системы")
+
+    st.write(
+        "Проверка доступности Aylin API."
     )
 
     health = api_get(
         "/health"
     )
 
-    if health:
+    if health is not None:
 
         st.success(
-            "Aylin работает"
+            "Aylin API работает"
         )
 
         st.json(
             health
         )
 
-    st.subheader(
-        "Информация об API"
-    )
+    else:
 
-    info = api_get(
-        "/api/info"
-    )
-
-    if info:
-
-        st.json(
-            info
+        st.error(
+            "Aylin API недоступен"
         )
 
-    st.caption(
-        "Wazzup/WhatsApp пока не подключён. "
-        "Интеграция будет выполнена после согласования логики диалога."
+    st.divider()
+
+    st.write(
+        "**API:**"
+    )
+
+    st.code(
+        API_URL
+    )
+
+    st.write(
+        "**Основной endpoint:**"
+    )
+
+    st.code(
+        "/conversation/message"
     )
