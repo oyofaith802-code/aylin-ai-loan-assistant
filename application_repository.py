@@ -3,10 +3,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-load_dotenv(
-    "/opt/aylin/backend/.env",
-    override=True
-)
+load_dotenv()
 
 from sqlalchemy import (
     create_engine,
