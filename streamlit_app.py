@@ -1,14 +1,20 @@
 import streamlit as st
 import requests
+import time
 
 
 API_URL = "https://aylin-ai-loan-assistant.onrender.com"
 
 
+# ============================================================
+# PAGE CONFIG
+# ============================================================
+
 st.set_page_config(
-    page_title="Aylin AI Loan Assistant",
+    page_title="Aylin — AI помощник",
     page_icon="🤖",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -26,11 +32,14 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "page" not in st.session_state:
-    st.session_state.page = "Conversation"
+    st.session_state.page = "Диалог"
+
+if "started" not in st.session_state:
+    st.session_state.started = False
 
 
 # ============================================================
-# API HELPER
+# API
 # ============================================================
 
 def api_get(endpoint):
@@ -49,7 +58,7 @@ def api_get(endpoint):
     except requests.RequestException as error:
 
         st.error(
-            f"API connection error: {error}"
+            f"Не удалось подключиться к серверу: {error}"
         )
 
         return None
@@ -64,15 +73,15 @@ with st.sidebar:
     st.title("🤖 Aylin")
 
     st.caption(
-        "AI Loan Assistant"
+        "AI-помощник по оформлению займа"
     )
 
     st.divider()
 
-    st.subheader("Customer")
+    st.subheader("Клиент")
 
     phone = st.text_input(
-        "Phone number",
+        "Номер телефона",
         value=st.session_state.phone,
         placeholder="996555123456",
     )
@@ -81,102 +90,150 @@ with st.sidebar:
 
     st.divider()
 
-    st.subheader("Navigation")
+    st.subheader("Разделы")
 
     if st.button(
-        "💬 Conversation",
+        "💬 Диалог",
         use_container_width=True,
     ):
-        st.session_state.page = "Conversation"
+        st.session_state.page = "Диалог"
+        st.rerun()
 
     if st.button(
-        "📋 Current Application",
+        "📋 Текущая заявка",
         use_container_width=True,
     ):
-        st.session_state.page = "Current Application"
+        st.session_state.page = "Текущая заявка"
+        st.rerun()
 
     if st.button(
-        "📜 Conversation History",
+        "📜 История диалога",
         use_container_width=True,
     ):
-        st.session_state.page = "Conversation History"
+        st.session_state.page = "История диалога"
+        st.rerun()
 
     if st.button(
-        "🗂 Application History",
+        "🗂 История заявок",
         use_container_width=True,
     ):
-        st.session_state.page = "Application History"
+        st.session_state.page = "История заявок"
+        st.rerun()
 
     if st.button(
-        "🔗 System Status",
+        "🔗 Состояние системы",
         use_container_width=True,
     ):
-        st.session_state.page = "System Status"
+        st.session_state.page = "Состояние системы"
+        st.rerun()
 
     st.divider()
 
     if st.session_state.application_id:
 
-        st.subheader("Application")
+        st.subheader("Заявка")
+
+        st.write(
+            "Номер заявки:"
+        )
 
         st.code(
             st.session_state.application_id
         )
 
+    st.divider()
+
     if st.button(
-        "Clear Conversation",
+        "🗑 Начать новый диалог",
         use_container_width=True,
     ):
 
         st.session_state.messages = []
         st.session_state.application_id = None
+        st.session_state.started = False
 
         st.rerun()
 
 
 # ============================================================
-# CONVERSATION
+# MAIN — CONVERSATION
 # ============================================================
 
-if st.session_state.page == "Conversation":
+if st.session_state.page == "Диалог":
 
     st.title(
-        "💬 Conversation"
+        "💬 Диалог с Aylin"
     )
 
     st.caption(
-        "Test Aylin's loan application conversation."
+        "Проверьте, как Aylin общается с клиентом и собирает информацию для заявки."
     )
 
-    if not st.session_state.phone:
+    # --------------------------------------------------------
+    # WELCOME
+    # --------------------------------------------------------
+
+    if not st.session_state.messages:
 
         st.info(
-            "Enter the customer's phone number in the sidebar."
+            "Здравствуйте! Я Aylin — AI-помощник по оформлению займа. "
+            "Введите сообщение клиента ниже, чтобы начать диалог."
         )
+
+        st.markdown(
+            """
+**Примеры сообщений клиента:**
+
+- «У меня Toyota Camry 2021 года, хочу получить 500000 сом»
+- «Машина стоит примерно 1500000 сом»
+- «Хочу оформить займ без изъятия автомобиля»
+- «Я нахожусь в Бишкеке»
+- «Мне нужен займ на 12 месяцев»
+"""
+        )
+
+    # --------------------------------------------------------
+    # CHAT HISTORY
+    # --------------------------------------------------------
 
     for message in st.session_state.messages:
 
+        avatar = (
+            "👤"
+            if message["role"] == "user"
+            else "🤖"
+        )
+
         with st.chat_message(
-            message["role"]
+            message["role"],
+            avatar=avatar,
         ):
 
             st.write(
                 message["content"]
             )
 
+    # --------------------------------------------------------
+    # CHAT INPUT
+    # --------------------------------------------------------
+
     user_message = st.chat_input(
-        "Введите сообщение клиента..."
+        "Напишите сообщение клиента..."
     )
 
     if user_message:
 
         if not st.session_state.phone:
 
-            st.error(
-                "Введите номер телефона клиента."
+            st.warning(
+                "Сначала укажите номер телефона клиента слева."
             )
 
             st.stop()
+
+        # ----------------------------------------------------
+        # CUSTOMER MESSAGE
+        # ----------------------------------------------------
 
         st.session_state.messages.append(
             {
@@ -185,7 +242,10 @@ if st.session_state.page == "Conversation":
             }
         )
 
-        with st.chat_message("user"):
+        with st.chat_message(
+            "user",
+            avatar="👤",
+        ):
 
             st.write(
                 user_message
@@ -204,164 +264,232 @@ if st.session_state.page == "Conversation":
 
         }
 
-        try:
+        # ----------------------------------------------------
+        # AI RESPONSE
+        # ----------------------------------------------------
 
-            response = requests.post(
+        with st.chat_message(
+            "assistant",
+            avatar="🤖",
+        ):
 
-                f"{API_URL}/conversation/message",
+            with st.spinner(
+                "Aylin анализирует сообщение..."
+            ):
 
-                json=payload,
+                try:
 
-                timeout=60,
+                    response = requests.post(
 
-            )
+                        f"{API_URL}/conversation/message",
 
-            response.raise_for_status()
+                        json=payload,
 
-            data = response.json()
+                        timeout=90,
 
-            st.session_state.application_id = (
+                    )
 
-                data.get("application_id")
+                    response.raise_for_status()
 
-                or
+                    data = response.json()
 
-                st.session_state.application_id
+                    st.session_state.application_id = (
 
-            )
+                        data.get("application_id")
 
-            aylin_response = data.get(
+                        or
+                        st.session_state.application_id
 
-                "response",
+                    )
 
-                "Не удалось получить ответ от Aylin."
+                    aylin_response = data.get(
+                        "response",
+                        "Извините, сейчас не удалось получить ответ.",
+                    )
 
-            )
+                    # Small delay makes the interface feel
+                    # more natural without slowing the API.
 
-            st.session_state.messages.append(
+                    time.sleep(0.3)
 
-                {
-                    "role":
-                        "assistant",
+                    st.write(
+                        aylin_response
+                    )
 
-                    "content":
-                        aylin_response,
+                    st.session_state.messages.append(
+                        {
+                            "role":
+                                "assistant",
 
-                }
+                            "content":
+                                aylin_response,
+                        }
+                    )
 
-            )
+                except requests.RequestException as error:
 
-            with st.chat_message("assistant"):
+                    st.error(
+                        "Не удалось получить ответ от Aylin. "
+                        "Попробуйте ещё раз."
+                    )
 
-                st.write(
-                    aylin_response
-                )
+                    st.caption(
+                        str(error)
+                    )
 
-        except requests.RequestException as error:
+                except Exception as error:
 
-            st.error(
-                f"Ошибка подключения к Aylin API: {error}"
-            )
+                    st.error(
+                        "Произошла ошибка при обработке сообщения."
+                    )
 
-        except Exception as error:
-
-            st.error(
-                f"Ошибка: {error}"
-            )
+                    st.caption(
+                        str(error)
+                    )
 
 
 # ============================================================
 # CURRENT APPLICATION
 # ============================================================
 
-elif st.session_state.page == "Current Application":
+elif st.session_state.page == "Текущая заявка":
 
     st.title(
-        "📋 Current Application"
+        "📋 Текущая заявка"
+    )
+
+    st.caption(
+        "Информация, которую Aylin уже собрала о клиенте."
     )
 
     if not st.session_state.phone:
 
         st.info(
-            "Enter a customer phone number first."
+            "Укажите номер телефона клиента слева."
         )
 
     else:
 
         data = api_get(
-
-            f"/applications/current/"
-            f"{st.session_state.phone}"
-
+            f"/applications/current/{st.session_state.phone}"
         )
 
         if data:
 
             st.success(
-                "Current application found."
+                "Заявка найдена"
             )
 
-            st.json(
+            customer = data.get(
+                "customer",
                 data
             )
+
+            if isinstance(customer, dict):
+
+                columns = [
+
+                    ("car_model", "Автомобиль"),
+
+                    ("car_year", "Год выпуска"),
+
+                    ("car_value", "Стоимость автомобиля"),
+
+                    ("loan_amount", "Сумма займа"),
+
+                    ("loan_program", "Программа займа"),
+
+                    ("loan_term_months", "Срок займа"),
+
+                    ("vehicle_possession", "Условия хранения автомобиля"),
+
+                    ("registration_region", "Регион регистрации"),
+
+                    ("stage", "Этап"),
+
+                ]
+
+                for key, label in columns:
+
+                    value = customer.get(key)
+
+                    if value is not None:
+
+                        st.write(
+                            f"**{label}:** {value}"
+                        )
+
+            else:
+
+                st.json(
+                    data
+                )
 
 
 # ============================================================
 # CONVERSATION HISTORY
 # ============================================================
 
-elif st.session_state.page == "Conversation History":
+elif st.session_state.page == "История диалога":
 
     st.title(
-        "📜 Conversation History"
+        "📜 История диалога"
+    )
+
+    st.caption(
+        "Предыдущие сообщения по текущей заявке."
     )
 
     if not st.session_state.application_id:
 
         st.info(
-            "Start a conversation first. "
-            "The application ID will appear here."
+            "Сначала начните диалог с клиентом."
         )
 
     else:
 
         data = api_get(
-
             "/dashboard/conversation/"
             f"{st.session_state.application_id}"
-
         )
 
         if data:
 
-            st.json(
-                data
-            )
+            if isinstance(data, list):
+
+                for item in data:
+
+                    st.write(item)
+
+            else:
+
+                st.json(data)
 
 
 # ============================================================
 # APPLICATION HISTORY
 # ============================================================
 
-elif st.session_state.page == "Application History":
+elif st.session_state.page == "История заявок":
 
     st.title(
-        "🗂 Application History"
+        "🗂 История заявок"
+    )
+
+    st.caption(
+        "Все предыдущие заявки клиента."
     )
 
     if not st.session_state.phone:
 
         st.info(
-            "Enter a customer phone number first."
+            "Укажите номер телефона клиента слева."
         )
 
     else:
 
         data = api_get(
-
-            f"/applications/history/"
-            f"{st.session_state.phone}"
-
+            f"/applications/history/{st.session_state.phone}"
         )
 
         if data:
@@ -372,7 +500,7 @@ elif st.session_state.page == "Application History":
             )
 
             st.metric(
-                "Applications",
+                "Количество заявок",
                 count
             )
 
@@ -385,11 +513,11 @@ elif st.session_state.page == "Application History":
 
                 for index, application in enumerate(
                     applications,
-                    start=1
+                    start=1,
                 ):
 
                     with st.expander(
-                        f"Application {index}"
+                        f"Заявка №{index}"
                     ):
 
                         st.json(
@@ -399,7 +527,7 @@ elif st.session_state.page == "Application History":
             else:
 
                 st.info(
-                    "No previous applications found."
+                    "У клиента пока нет предыдущих заявок."
                 )
 
 
@@ -407,18 +535,10 @@ elif st.session_state.page == "Application History":
 # SYSTEM STATUS
 # ============================================================
 
-elif st.session_state.page == "System Status":
+elif st.session_state.page == "Состояние системы":
 
     st.title(
-        "🔗 System Status"
-    )
-
-    st.write(
-        "Backend:"
-    )
-
-    st.code(
-        API_URL
+        "🔗 Состояние системы"
     )
 
     health = api_get(
@@ -428,7 +548,7 @@ elif st.session_state.page == "System Status":
     if health:
 
         st.success(
-            "Backend is online"
+            "Aylin работает"
         )
 
         st.json(
@@ -436,7 +556,7 @@ elif st.session_state.page == "System Status":
         )
 
     st.subheader(
-        "API Information"
+        "Информация об API"
     )
 
     info = api_get(
@@ -448,3 +568,8 @@ elif st.session_state.page == "System Status":
         st.json(
             info
         )
+
+    st.caption(
+        "Wazzup/WhatsApp пока не подключён. "
+        "Интеграция будет выполнена после согласования логики диалога."
+    )
