@@ -60,7 +60,7 @@ def api_get(endpoint):
     except Exception as error:
 
         st.error(
-            f"API error: {error}"
+            f"Ошибка API: {error}"
         )
 
         return None
@@ -74,6 +74,26 @@ def get_customer():
 
     return api_get(
         f"/applications/current/{st.session_state.phone}"
+    )
+
+
+def get_conversation_history():
+
+    application_id = st.session_state.application_id
+
+    if not application_id:
+        return []
+
+    data = api_get(
+        f"/applications/conversation/{application_id}"
+    )
+
+    if not data:
+        return []
+
+    return data.get(
+        "messages",
+        []
     )
 
 
@@ -98,13 +118,13 @@ def reset_client():
 
 def show_customer_card(customer):
 
-    st.subheader("👤 Customer Card")
+    st.subheader("👤 Карточка клиента")
 
     if not customer:
 
         st.info(
-            "Customer information will appear here "
-            "after the first message."
+            "Информация о клиенте появится здесь "
+            "после первого сообщения."
         )
 
         return
@@ -118,23 +138,23 @@ def show_customer_card(customer):
 
     fields = [
 
-        ("car_model", "🚗 Vehicle model"),
+        ("car_model", "🚗 Модель автомобиля"),
 
-        ("car_year", "📅 Year"),
+        ("car_year", "📅 Год выпуска"),
 
-        ("car_value", "💰 Vehicle value"),
+        ("car_value", "💰 Стоимость автомобиля"),
 
-        ("loan_amount", "💵 Loan amount"),
+        ("loan_amount", "💵 Сумма займа"),
 
-        ("loan_program", "📋 Loan program"),
+        ("loan_program", "📋 Программа займа"),
 
-        ("loan_term_months", "⏱ Loan term"),
+        ("loan_term_months", "⏱ Срок займа"),
 
-        ("vehicle_possession", "🔐 Vehicle possession"),
+        ("vehicle_possession", "🔐 Местонахождение автомобиля"),
 
-        ("registration_region", "📍 Registration region"),
+        ("registration_region", "📍 Регион регистрации"),
 
-        ("stage", "⚙️ Stage"),
+        ("stage", "⚙️ Этап заявки"),
 
     ]
 
@@ -146,7 +166,7 @@ def show_customer_card(customer):
 
         if value in (None, ""):
 
-            display_value = "Not specified"
+            display_value = "Не указано"
 
         else:
 
@@ -178,7 +198,7 @@ def show_customer_card(customer):
             if value not in (None, ""):
 
                 display_value = (
-                    f"{value} months"
+                    f"{value} мес."
                 )
 
 
@@ -187,13 +207,13 @@ def show_customer_card(customer):
             if value == "customer":
 
                 display_value = (
-                    "Vehicle remains with customer"
+                    "Автомобиль остаётся у клиента"
                 )
 
             elif value == "lender":
 
                 display_value = (
-                    "Secure parking"
+                    "Охраняемая стоянка"
                 )
 
 
@@ -237,7 +257,7 @@ def show_customer_card(customer):
     if application_id:
 
         st.caption(
-            "Application ID"
+            "ID заявки"
         )
 
         st.code(
@@ -254,7 +274,7 @@ with st.sidebar:
     st.title("🤖 Aylin")
 
     st.caption(
-        "AI Loan Assistant — Testing Center"
+        "AI-помощник по займам — Центр тестирования"
     )
 
     st.divider()
@@ -264,10 +284,10 @@ with st.sidebar:
     # CLIENT
     # --------------------------------------------------------
 
-    st.subheader("👤 Test Client")
+    st.subheader("👤 Тестовый клиент")
 
     phone = st.text_input(
-        "Phone number",
+        "Номер телефона",
         value=st.session_state.phone,
         placeholder="996555123456",
     )
@@ -304,7 +324,7 @@ with st.sidebar:
 
 
     if st.button(
-        "💬 Conversation",
+        "💬 Диалог",
         use_container_width=True,
     ):
 
@@ -314,7 +334,7 @@ with st.sidebar:
 
 
     if st.button(
-        "👤 Customer Card",
+        "👤 Карточка клиента",
         use_container_width=True,
     ):
 
@@ -334,7 +354,7 @@ with st.sidebar:
 
 
     if st.button(
-        "🗂 Applications",
+        "🗂 Заявки",
         use_container_width=True,
     ):
 
@@ -344,7 +364,7 @@ with st.sidebar:
 
 
     if st.button(
-        "🎙️ Audio",
+        "🎙️ Аудио",
         use_container_width=True,
     ):
 
@@ -364,7 +384,7 @@ with st.sidebar:
 
 
     if st.button(
-        "🔗 System Status",
+        "🔗 Статус системы",
         use_container_width=True,
     ):
 
@@ -376,7 +396,7 @@ with st.sidebar:
     st.divider()
 
     st.caption(
-        "Aylin Testing Center"
+        "Центр тестирования Aylin"
     )
 
 
@@ -386,11 +406,11 @@ with st.sidebar:
 
 if st.session_state.page == "Диалог":
 
-    st.title("💬 Aylin Conversation")
+    st.title("💬 Диалог с Aylin")
 
     st.caption(
-        "Test real customer conversations while watching "
-        "the customer card update."
+        "Тестируйте реальные диалоги с клиентами и наблюдайте "
+        "за обновлением карточки клиента."
     )
 
 
@@ -411,22 +431,66 @@ if st.session_state.page == "Диалог":
         if not st.session_state.phone:
 
             st.info(
-                "Enter a customer phone number in the sidebar."
+                "Введите номер телефона клиента в боковой панели."
             )
+
+
+        # ----------------------------------------------------
+        # LOAD PERSISTENT CONVERSATION HISTORY
+        # ----------------------------------------------------
+
+        if st.session_state.application_id:
+
+            persistent_messages = (
+                get_conversation_history()
+            )
+
+            if persistent_messages:
+
+                st.session_state.messages = []
+
+                for message in persistent_messages:
+
+                    sender = message.get(
+                        "sender"
+                    )
+
+                    content = message.get(
+                        "message",
+                        ""
+                    )
+
+                    if sender == "customer":
+
+                        st.session_state.messages.append(
+                            {
+                                "role": "user",
+                                "content": content,
+                            }
+                        )
+
+                    elif sender == "aylin":
+
+                        st.session_state.messages.append(
+                            {
+                                "role": "assistant",
+                                "content": content,
+                            }
+                        )
 
 
         if not st.session_state.messages:
 
             st.markdown(
                 """
-### Start a test
+### Начните тест
 
-Try a complete customer message:
+Попробуйте полное сообщение клиента:
 
 > У меня Toyota Camry 2021 года, стоимость примерно
 > 1500000 сом, хочу получить 500000 сом
 
-Or test a natural conversation step by step.
+Или протестируйте обычный диалог шаг за шагом.
                 """
             )
 
@@ -467,7 +531,7 @@ Or test a natural conversation step by step.
         # ----------------------------------------------------
 
         user_message = st.chat_input(
-            "Type customer message..."
+            "Введите сообщение клиента..."
         )
 
 
@@ -476,7 +540,7 @@ Or test a natural conversation step by step.
             if not st.session_state.phone:
 
                 st.warning(
-                    "Enter the customer's phone number first."
+                    "Сначала введите номер телефона клиента."
                 )
 
                 st.stop()
@@ -568,7 +632,7 @@ Or test a natural conversation step by step.
             except Exception as error:
 
                 st.error(
-                    f"Could not contact Aylin API: {error}"
+                    f"Не удалось связаться с API Aylin: {error}"
                 )
 
 
@@ -591,7 +655,7 @@ Or test a natural conversation step by step.
 
 elif st.session_state.page == "Карточка клиента":
 
-    st.title("👤 Customer Card")
+    st.title("👤 Карточка клиента")
 
     st.caption(
         "Information collected by Aylin."
@@ -620,10 +684,10 @@ elif st.session_state.page == "Карточка клиента":
 
 elif st.session_state.page == "История диалога":
 
-    st.title("📜 Conversation History")
+    st.title("📜 История диалога")
 
     st.caption(
-        "Messages from the current testing session."
+        "Сообщения из текущей тестовой сессии."
     )
 
 
@@ -640,14 +704,14 @@ elif st.session_state.page == "История диалога":
         ):
 
             role = (
-                "👤 Customer"
+                "👤 Клиент"
                 if message["role"] == "user"
                 else "🤖 Aylin"
             )
 
 
             with st.expander(
-                f"{role} — Message {index + 1}"
+                f"{role} — Сообщение {index + 1}"
             ):
 
                 st.write(
@@ -661,7 +725,7 @@ elif st.session_state.page == "История диалога":
 
 elif st.session_state.page == "История заявок":
 
-    st.title("🗂 Applications")
+    st.title("🗂 Заявки")
 
     st.caption(
         "Previous applications associated with this client."
@@ -671,7 +735,7 @@ elif st.session_state.page == "История заявок":
     if not st.session_state.phone:
 
         st.info(
-            "Enter a customer phone number."
+            "Введите номер телефона клиента."
         )
 
     else:
@@ -720,10 +784,10 @@ elif st.session_state.page == "История заявок":
 
 elif st.session_state.page == "Аудио":
 
-    st.title("🎙️ Audio Testing")
+    st.title("🎙️ Тестирование аудио")
 
     st.caption(
-        "Test customer voice messages before connecting "
+        "Тестируйте голосовые сообщения клиентов перед подключением "
         "speech-to-text to Aylin."
     )
 
@@ -760,7 +824,7 @@ elif st.session_state.page == "Аудио":
 
 
             st.success(
-                "Audio captured successfully."
+                "Аудио успешно получено."
             )
 
 
@@ -823,7 +887,7 @@ elif st.session_state.page == "Аудио":
 
 elif st.session_state.page == "CSV":
 
-    st.title("📊 CSV Testing")
+    st.title("📊 Тестирование CSV")
 
     st.caption(
         "Upload customer data for testing and inspection."
@@ -891,7 +955,7 @@ elif st.session_state.page == "CSV":
 
 
             metric3.metric(
-                "Missing values",
+                "Пропущенные значения",
                 f"{int(dataframe.isna().sum().sum()):,}"
             )
 
@@ -930,7 +994,7 @@ elif st.session_state.page == "CSV":
         except Exception as error:
 
             st.error(
-                f"Could not read CSV: {error}"
+                f"Не удалось прочитать CSV: {error}"
             )
 
 
@@ -947,11 +1011,11 @@ elif st.session_state.page == "CSV":
 
 elif st.session_state.page == "Состояние системы":
 
-    st.title("🔗 System Status")
+    st.title("🔗 Статус системы")
 
 
     st.write(
-        "Checking Aylin API..."
+        "Проверка API Aylin..."
     )
 
 
@@ -963,7 +1027,7 @@ elif st.session_state.page == "Состояние системы":
     if health is not None:
 
         st.success(
-            "🟢 Aylin API is online"
+            "🟢 API Aylin работает"
         )
 
 
@@ -974,7 +1038,7 @@ elif st.session_state.page == "Состояние системы":
     else:
 
         st.error(
-            "🔴 Aylin API is unavailable"
+            "🔴 API Aylin недоступен"
         )
 
 
@@ -987,7 +1051,7 @@ elif st.session_state.page == "Состояние системы":
     with col1:
 
         st.metric(
-            "Messages in current session",
+            "Сообщений в текущей сессии",
             len(st.session_state.messages)
         )
 
@@ -1012,7 +1076,7 @@ elif st.session_state.page == "Состояние системы":
 
 
     st.subheader(
-        "Conversation endpoint"
+        "Эндпоинт диалога"
     )
 
 

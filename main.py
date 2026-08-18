@@ -11,6 +11,10 @@ from application_manager import (
     start_new_application,
 )
 
+from application_repository import (
+    get_conversation_history,
+)
+
 from wazzup_api import router as wazzup_router
 from dashboard_api import router as dashboard_router
 
@@ -37,6 +41,39 @@ app.include_router(
 app.include_router(
     dashboard_router
 )
+
+
+# ============================================================
+# PERSISTENT CONVERSATION HISTORY
+# ============================================================
+
+@app.get(
+    "/applications/conversation/{application_id}"
+)
+def conversation_history(
+    application_id: str
+):
+
+    messages = get_conversation_history(
+        application_id
+    )
+
+    return {
+        "application_id": application_id,
+        "messages": [
+            {
+                "id": message.id,
+                "sender": message.sender,
+                "message": message.message,
+                "created_at": (
+                    message.created_at.isoformat()
+                    if message.created_at
+                    else None
+                ),
+            }
+            for message in messages
+        ],
+    }
 
 
 # ============================================================
