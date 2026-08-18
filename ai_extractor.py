@@ -331,6 +331,15 @@ def clean_car_model(value):
         flags=re.IGNORECASE
     ).strip()
 
+    # Remove Kyrgyz year suffix
+    # Example: "Toyota Camry 2021-жылкы" -> "Toyota Camry"
+    value = re.sub(
+        r"(?:\s*[-–—]?\s*жылкы)$",
+        "",
+        value,
+        flags=re.IGNORECASE
+    ).strip()
+
     # Remove common connecting words
     value = re.sub(
         r"\s+(?:года|год|г\.)$",
@@ -565,6 +574,18 @@ def extract_car_value(text):
         r"\s*(?:сом|сома|сомов)?"
         r".{0,30}?\bтурат\b",
 
+        # Унаамдын болжолдуу баасы 1.5 млн сом
+        r"\b(?:унаамдын|унаанын|машинанын)"
+        r".{0,40}?"
+        r"(\d+(?:[.,]\d+)?\s*(?:млн|миллион|миң|мин|к))"
+        r"\s*(?:сом|сома|сомов)?\b",
+
+        # Унаамдын болжолдуу баасы 1500000 сом
+        r"\b(?:унаамдын|унаанын|машинанын)"
+        r".{0,40}?"
+        r"(\d[\d\s\u00a0]*(?:[.,]\d+)?)"
+        r"\s*(?:сом|сома|сомов)\b",
+
         # 1.5 млн сом турат
         r"\b"
         r"(\d+(?:[.,]\d+)?\s*(?:млн|миллион|миң|мин|к))"
@@ -743,6 +764,14 @@ def extract_vehicle_possession(text):
         "унаам менде калсын",
         "унаа менде калат",
         "унаам менде калат",
+
+        # Kyrgyz — customer explicitly wants to keep the vehicle
+        "машинаны өзүмдө калтыргым келет",
+        "машинамды өзүмдө калтыргым келет",
+        "унааны өзүмдө калтыргым келет",
+        "унаамды өзүмдө калтыргым келет",
+        "машинаны өзүмдө калтыр",
+        "машинамды өзүмдө калтыр",
     ]
 
     for phrase in customer_patterns:
@@ -924,6 +953,12 @@ def extract_loan_term(text):
         r"\b(\d+)\s*"
         r"(?:айга|ай)\b",
 
+        # Kyrgyz:
+        # 2 жылга алсам деп ойлоп жатам
+        # Convert years to months below.
+        r"\b(\d+)\s*"
+        r"(?:жылга|жыл|жылдык)\b",
+
         # 24 ай мөөнөткө
         r"\b(\d+)\s*"
         r"(?:айлык|ай)\s+"
@@ -941,7 +976,15 @@ def extract_loan_term(text):
         if not match:
             continue
 
-        months = int(match.group(1))
+        amount = int(match.group(1))
+
+        # Kyrgyz "жылга" / "жыл" means years.
+        matched_text = match.group(0).lower()
+
+        if re.search(r"\b(?:жылга|жыл|жылдык)\b", matched_text):
+            months = amount * 12
+        else:
+            months = amount
 
         if 1 <= months <= 120:
             return months
