@@ -38,3 +38,34 @@ def process_stage(customer: CustomerCard) -> dict:
         }
 
     return result
+
+# ============================================================
+# COMPATIBILITY API
+# ============================================================
+
+def set_stage(
+    customer: CustomerCard,
+    stage
+) -> CustomerCard:
+    """
+    Compatibility wrapper for older stage-manager tests.
+
+    The canonical storage remains customer.stage.
+    """
+
+    if hasattr(stage, "value"):
+        customer.stage = stage.value
+    else:
+        customer.stage = str(stage)
+
+    return customer
+
+
+def get_stage(
+    customer: CustomerCard
+) -> str:
+    """
+    Return the current application stage.
+    """
+
+    return customer.stage

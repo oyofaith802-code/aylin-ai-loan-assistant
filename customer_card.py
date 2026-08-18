@@ -43,10 +43,22 @@ class CustomerCard:
     registration_region: Optional[str] = None
 
     # --------------------------------------------------------
+    # LANGUAGE
+    # --------------------------------------------------------
+
+    language: str = "russian"
+
+    # --------------------------------------------------------
     # APPLICATION STATE
     # --------------------------------------------------------
 
     stage: str = "new"
+
+    # Customer conversation language.
+    # Supported values:
+    #   russian
+    #   kyrgyz
+    language: str = "russian"
 
     decision: Optional[str] = None
     decision_reason: Optional[str] = None
@@ -54,6 +66,21 @@ class CustomerCard:
     errors: List[Dict[str, Any]] = field(
         default_factory=list
     )
+
+    # ========================================================
+    # STAGE COMPATIBILITY
+    # ========================================================
+
+    @property
+    def current_stage(self):
+        return self.stage
+
+    @current_stage.setter
+    def current_stage(self, value):
+        if hasattr(value, "value"):
+            self.stage = value.value
+        else:
+            self.stage = str(value)
 
     # ========================================================
     # TO DICT
@@ -77,7 +104,11 @@ class CustomerCard:
 
             "registration_region": self.registration_region,
 
+            "language": self.language,
+
             "stage": self.stage,
+
+            "language": self.language,
 
             "decision": self.decision,
             "decision_reason": self.decision_reason,
@@ -180,10 +211,16 @@ class CustomerCard:
                 "registration_region"
             ),
 
+            language=data.get(
+                "language",
+                "russian",
+            ),
+
             stage=data.get(
                 "stage",
                 "new",
             ),
+
 
             decision=data.get(
                 "decision"

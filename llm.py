@@ -3,6 +3,14 @@ from __future__ import annotations
 import os
 import requests
 from typing import Optional
+from dotenv import load_dotenv
+
+
+# ============================================================
+# ENVIRONMENT
+# ============================================================
+
+load_dotenv()
 
 
 # ============================================================

@@ -449,12 +449,6 @@ def _extract_loan_term(
 
     patterns = [
 
-        # "на месяц" = 1 month
-        r"\bна\s+месяц\b",
-
-        # "на один месяц" = 1 month
-        r"\bна\s+один\s+месяц\b",
-
         r"\bна\s+(\d+)\s+"
         r"(?:месяц|месяца|месяцев)\b",
 
@@ -485,6 +479,9 @@ def _extract_loan_term(
 
         try:
 
+            if match.lastindex is None:
+                continue
+
             months = int(
                 match.group(1)
             )
@@ -492,7 +489,7 @@ def _extract_loan_term(
             if 1 <= months <= 120:
                 return months
 
-        except ValueError:
+        except (ValueError, TypeError):
             pass
 
     # --------------------------------------------------------

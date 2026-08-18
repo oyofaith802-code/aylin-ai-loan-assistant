@@ -78,11 +78,17 @@ def extract_loan_amount(text):
 
     patterns = [
 
+        # -------------------------
+        # RUSSIAN
+        # -------------------------
+
         r"\bнам\s+нужн[оа]\s+" + MONEY_PATTERN,
 
-        r"\b(?:мы\s+)?хотим\s+получить\s+" + MONEY_PATTERN,
+        r"\b(?:мы\s+)?хотим\s+получить\s+"
+        + MONEY_PATTERN,
 
-        r"\bхотели\s+бы\s+получить\s+" + MONEY_PATTERN,
+        r"\bхотели\s+бы\s+получить\s+"
+        + MONEY_PATTERN,
 
         r"\bполучить\s+под\s+(?:него|этот\s+автомобиль)\s+"
         + MONEY_PATTERN,
@@ -93,6 +99,37 @@ def extract_loan_amount(text):
 
         r"\b(?:хочу|хотим)\s+(?:получить|взять)\s+"
         + MONEY_PATTERN,
+
+        # -------------------------
+        # KYRGYZ
+        # -------------------------
+
+        # 500000 сом алгым келет
+        r"\b"
+        r"(\d[\d\s\u00a0]*(?:[.,]\d+)?)"
+        r"\s*(?:сом|сомов|сома|с)\b"
+        r".{0,40}?"
+        r"\bалгым\s+келет\b",
+
+        # 500000 сом алгым келет
+        r"\b"
+        r"(\d[\d\s\u00a0]*(?:[.,]\d+)?)"
+        r"\s*(?:сом|сомов|сома|с)\b"
+        r".{0,40}?"
+        r"\bалгым\b",
+
+        # Насыя катары 500000 сом алгым келет
+        r"\bнасыя"
+        r".{0,80}?"
+        r"(\d[\d\s\u00a0]*(?:[.,]\d+)?)"
+        r"\s*(?:сом|сомов|сома|с)\b",
+
+        # 500000 сом керек
+        r"\b"
+        r"(\d[\d\s\u00a0]*(?:[.,]\d+)?)"
+        r"\s*(?:сом|сомов|сома|с)\b"
+        r".{0,30}?"
+        r"\bкерек\b",
     ]
 
     for pattern in patterns:
@@ -103,16 +140,17 @@ def extract_loan_amount(text):
             flags=re.IGNORECASE | re.DOTALL
         )
 
-        if match:
+        if not match:
+            continue
 
-            for group in match.groups():
+        for group in match.groups():
 
-                number = parse_number(group)
+            number = parse_number(group)
 
-                if number is not None:
+            if number is not None:
 
-                    if 1_000 <= number <= 100_000_000:
-                        return number
+                if 1_000 <= number <= 100_000_000:
+                    return number
 
     return None
 
@@ -326,20 +364,44 @@ def extract_car_model(text):
 
 def extract_car_value(text):
 
+    text = text.strip()
+
+    # --------------------------------------------------------
+    # Explicit car-value patterns
+    # --------------------------------------------------------
+
     patterns = [
 
-        r"\b(?:примерная\s+)?стоимость\s+"
-        r"(?:автомобиля|машины)"
-        r".{0,80}?"
+        # Машина стоит примерно 1500000 сом
+        r"\b(?:автомобиль|машина)\s+"
+        r"(?:стоит|обойдется|обойдётся)"
+        r"(?:\s+примерно|\s+около|\s+приблизительно)?\s*"
         + MONEY_PATTERN,
 
-        r"\b(?:рыночная\s+)?стоимость\s+"
+        # Стоимость автомобиля 1500000 сом
+        r"\b(?:примерная\s+)?стоимость\s+"
+        r"(?:автомобиля|машины)"
         r".{0,100}?"
         + MONEY_PATTERN,
 
+        # Думаю, ее стоимость около 1.5 млн сом
+        r"\b(?:е[её]|его|машины|автомобиля)\s+"
+        r"стоимость\s+"
+        r"(?:примерно|около|приблизительно)?\s*"
+        r"(" + r"\d+(?:[.,]\d+)?\s*(?:млн|миллион(?:а|ов)?|тыс|тысяч|к)" + r")"
+        r"\s*(?:сом|сома|сомов)?\b",
+
+        # Стоимость около 1.5 млн сом
+        r"\bстоимость\s+"
+        r"(?:примерно|около|приблизительно)?\s*"
+        r"(" + r"\d+(?:[.,]\d+)?\s*(?:млн|миллион(?:а|ов)?|тыс|тысяч|к)" + r")"
+        r"\s*(?:сом|сома|сомов)?\b",
+
+        # Цена около 1.5 млн сом
         r"\bцена\s+"
-        r".{0,80}?"
-        + MONEY_PATTERN,
+        r"(?:примерно|около|приблизительно)?\s*"
+        r"(" + r"\d+(?:[.,]\d+)?\s*(?:млн|миллион(?:а|ов)?|тыс|тысяч|к)" + r")"
+        r"\s*(?:сом|сома|сомов)?\b",
     ]
 
     for pattern in patterns:
@@ -347,19 +409,28 @@ def extract_car_value(text):
         match = re.search(
             pattern,
             text,
-            flags=re.IGNORECASE | re.DOTALL
+            flags=re.IGNORECASE
         )
 
-        if match:
+        if not match:
+            continue
 
-            for group in match.groups():
+        value = parse_number(
+            match.group(1) if match.lastindex else match.group(0)
+        )
 
-                number = parse_number(group)
+        if value is not None and value > 0:
+            return value
 
-                if number is not None:
-
-                    if 1_000 <= number <= 100_000_000:
-                        return number
+    # --------------------------------------------------------
+    # IMPORTANT:
+    # Do NOT use generic money phrases here.
+    #
+    # Example:
+    # "Мне нужно примерно 500 тысяч сом."
+    #
+    # is a loan request, not a car value.
+    # --------------------------------------------------------
 
     return None
 
@@ -424,13 +495,15 @@ def extract_loan_program(text):
 # ===========================================================
 def extract_vehicle_possession(text):
 
-    text_lower = text.lower()
+    text_lower = text.lower().strip()
 
     # --------------------------------------------------------
     # CUSTOMER KEEPS VEHICLE
     # --------------------------------------------------------
 
     customer_patterns = [
+
+        # Russian
         "без передачи автомобиля",
         "без передачи машины",
         "без изъятия автомобиля",
@@ -439,14 +512,35 @@ def extract_vehicle_possession(text):
         "машина останется у меня",
         "автомобиль остается у меня",
         "машина остается у меня",
-        "оставить автомобиль у себя",
-        "оставить машину у себя",
         "автомобиль останется у клиента",
         "машина останется у клиента",
+        "оставить автомобиль у себя",
+        "оставить машину у себя",
+        "машину хочу оставить у себя",
+        "автомобиль хочу оставить у себя",
+        "хочу оставить машину у себя",
+        "хочу оставить автомобиль у себя",
+        "машина будет у меня",
+        "автомобиль будет у меня",
+        "машину оставлю у себя",
+        "автомобиль оставлю у себя",
         "без передачи",
+
+        # Kyrgyz
+        "унаа өзүмдө калсын",
+        "унаам өзүмдө калсын",
+        "унаа өзүмдө калат",
+        "унаам өзүмдө калат",
+        "унааны өзүмдө калтыр",
+        "унаамды өзүмдө калтыр",
+        "унаа менде калсын",
+        "унаам менде калсын",
+        "унаа менде калат",
+        "унаам менде калат",
     ]
 
     for phrase in customer_patterns:
+
         if phrase in text_lower:
             return "customer"
 
@@ -455,6 +549,8 @@ def extract_vehicle_possession(text):
     # --------------------------------------------------------
 
     lender_patterns = [
+
+        # Russian
         "с передачей автомобиля",
         "с передачей машины",
         "передать автомобиль",
@@ -467,20 +563,37 @@ def extract_vehicle_possession(text):
         "на стоянке",
         "автомобиль будет на стоянке",
         "машина будет на стоянке",
+
+        # Kyrgyz
+        "унааны өткөрүп берем",
+        "унаамды өткөрүп берем",
+        "унаа өткөрүлөт",
+        "унаам өткөрүлөт",
+        "унаа токтотуучу жайда болот",
+        "унаам токтотуучу жайда болот",
+        "унаа унаа токтотуучу жайда",
+        "кайтарылуучу жайда",
     ]
 
     for phrase in lender_patterns:
+
         if phrase in text_lower:
             return "lender"
 
     return None
 
 
-
 # ============================================================
 # REGISTRATION REGION
 # ============================================================
 def extract_registration_region(text):
+
+    text_clean = text.strip()
+    text_lower = text_clean.lower()
+
+    # --------------------------------------------------------
+    # Russian
+    # --------------------------------------------------------
 
     patterns = [
 
@@ -494,15 +607,50 @@ def extract_registration_region(text):
         r"(?:в|:)\s*"
         r"([А-Яа-яЁёA-Za-z -]+)",
 
-        r"^\s*в\s+"
-        r"([А-Яа-яЁёA-Za-z-]+)\s*$",
+        # Kyrgyz
+        r"^(.+?)\s+катталганмын[.!?]?$",
+
+        r"^(.+?)\s+катталгам[.!?]?$",
+
+        r"^мен\s+(.+?)\s+катталганмын[.!?]?$",
+
+        r"^мен\s+(.+?)\s+катталгам[.!?]?$",
     ]
+
+    known_regions = {
+
+        "бишкек": "Бишкек",
+        "бишкекте": "Бишкек",
+
+        "ош": "Ош",
+        "ошто": "Ош",
+
+        "чуй": "Чуй",
+        "чуйда": "Чуй",
+
+        "ошская область": "Ошская область",
+
+        "иссык-куль": "Иссык-Куль",
+        "иссык куль": "Иссык-Куль",
+
+        "нарын": "Нарын",
+        "нарында": "Нарын",
+
+        "талас": "Талас",
+        "таласта": "Талас",
+
+        "джалал-абад": "Джалал-Абад",
+        "джалал абад": "Джалал-Абад",
+
+        "баткен": "Баткен",
+        "баткенде": "Баткен",
+    }
 
     for pattern in patterns:
 
         match = re.search(
             pattern,
-            text,
+            text_clean,
             flags=re.IGNORECASE
         )
 
@@ -518,25 +666,35 @@ def extract_registration_region(text):
         ).strip()
 
         value = re.sub(
-            r"\s+(?:и|но|а)$",
+            r"^(мен\s+)",
             "",
             value,
             flags=re.IGNORECASE
         ).strip()
 
-        if value:
-            return value
+        if not value:
+            continue
 
-    # Simple answer such as:
-    # "Бишкек"
-    if re.fullmatch(
-        r"[А-Яа-яЁёA-Za-z-]+",
-        text.strip()
-    ):
-        return text.strip()
+        normalized = value.lower().strip()
 
-    return None
+        if normalized in known_regions:
+            return known_regions[normalized]
 
+        # Remove Russian locative endings for known cities.
+        if normalized.endswith("е"):
+            candidate = normalized[:-1]
+            if candidate in known_regions:
+                return known_regions[candidate]
+
+        return value
+
+    # --------------------------------------------------------
+    # Simple known-region answer
+    # --------------------------------------------------------
+
+    normalized = text_lower.strip()
+
+    return known_regions.get(normalized)
 
 
 # ============================================================
@@ -547,12 +705,23 @@ def extract_loan_term(text):
 
     patterns = [
 
+        # Russian
         r"\bна\s+(\d+)\s*"
         r"(?:месяц|месяца|месяцев|мес\.?)\b",
 
         r"\bсрок(?:ом)?\s+"
         r"(\d+)\s*"
         r"(?:месяц|месяца|месяцев|мес\.?)\b",
+
+        # Kyrgyz:
+        # 24 айга алгым келет
+        r"\b(\d+)\s*"
+        r"(?:айга|ай)\b",
+
+        # 24 ай мөөнөткө
+        r"\b(\d+)\s*"
+        r"(?:айлык|ай)\s+"
+        r"(?:мөөнөткө|мөөнөт)",
     ]
 
     for pattern in patterns:
@@ -563,14 +732,13 @@ def extract_loan_term(text):
             flags=re.IGNORECASE
         )
 
-        if match:
+        if not match:
+            continue
 
-            months = int(
-                match.group(1)
-            )
+        months = int(match.group(1))
 
-            if 1 <= months <= 120:
-                return months
+        if 1 <= months <= 120:
+            return months
 
     return None
 

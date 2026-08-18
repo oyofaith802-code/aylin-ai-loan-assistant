@@ -74,7 +74,8 @@ def process_customer_message(
     # ========================================================
 
     stage_result = process_information_stage(
-        customer
+        customer,
+        customer_message=message,
     )
 
     # ========================================================

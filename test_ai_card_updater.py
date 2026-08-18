@@ -1,26 +1,35 @@
 from customer_card import CustomerCard
-from ai_card_updater import process_message_with_ai
+from ai_card_updater import update_customer_card_from_message
 
 
-customer = CustomerCard(
-    application_id="APP-001",
-    phone="test_phone"
-)
+def test_ai_card_updater_extracts_and_updates_customer_card():
 
-message = "У меня Toyota Camry 2021 года, хочу получить 500000 сом."
+    customer = CustomerCard(
+        application_id="APP-001",
+        phone="test_phone"
+    )
 
-information = process_message_with_ai(
-    customer,
-    message
-)
+    message = (
+        "У меня Toyota Camry 2021 года, "
+        "хочу получить 500000 сом."
+    )
 
-print("AI extracted:")
-print(information)
+    information = update_customer_card_from_message(
+        customer,
+        message
+    )
 
-print("\nCustomer card after AI update:")
-print("Car model:", customer.car_model)
-print("Car year:", customer.car_year)
-print("Car value:", customer.car_value)
-print("Loan amount:", customer.loan_amount)
-print("Loan program:", customer.loan_program)
-print("Registration region:", customer.registration_region)
+    # Extracted information
+    assert information["car_model"] == "Toyota Camry"
+    assert information["car_year"] == 2021
+    assert information["loan_amount"] == 500000.0
+
+    # Information merged into CustomerCard
+    assert customer.car_model == "Toyota Camry"
+    assert customer.car_year == 2021
+    assert customer.loan_amount == 500000.0
+
+    # These weren't provided and must remain empty
+    assert customer.car_value is None
+    assert customer.loan_program is None
+    assert customer.registration_region is None

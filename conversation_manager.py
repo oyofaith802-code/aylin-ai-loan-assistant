@@ -352,6 +352,9 @@ class ConversationManager:
 
             "message": message,
 
+            # Compatibility alias for older callers/tests.
+            "response": message,
+
             "next_field": next_field,
 
             "stage": self.card.stage,
@@ -470,5 +473,63 @@ def reset_conversation(
 # ============================================================
 # COMPATIBILITY
 # ============================================================
+
+def process_conversation_message(
+    customer,
+    message: str,
+) -> Dict[str, Any]:
+    """
+    Compatibility wrapper for older tests and callers.
+
+    Uses the supplied CustomerCard directly rather than
+    creating a separate ConversationManager.
+    """
+
+    if not message or not message.strip():
+        return {
+            "status": "invalid_message",
+            "response": "Пожалуйста, напишите Ваш вопрос или информацию.",
+            "next_field": None,
+            "stage": customer.stage,
+            "decision": customer.decision,
+            "decision_reason": customer.decision_reason,
+            "errors": list(customer.errors),
+        }
+
+    manager = ConversationManager(
+        application_id=customer.application_id,
+        phone=customer.phone,
+    )
+
+    manager.card = customer
+
+    result = manager.process_message(
+        message
+    )
+
+    return {
+        **result,
+        "decision": customer.decision,
+        "decision_reason": customer.decision_reason,
+    }
+
+
+def handle_customer_message(
+    phone: str,
+    message: str,
+    application_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Compatibility wrapper for the public phone-based API.
+
+    Delegates to the existing process_message() implementation.
+    """
+
+    return process_message(
+        phone=phone,
+        message=message,
+        application_id=application_id,
+    )
+
 
 RealConversationManager = ConversationManager

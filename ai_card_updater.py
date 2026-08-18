@@ -1,5 +1,6 @@
 from customer_card import CustomerCard
 from ai_extractor import extract_information_with_ai
+from question_generator import detect_language
 
 
 # ============================================================
@@ -18,6 +19,18 @@ def update_customer_card_from_message(
     None values from the extractor must NOT erase existing
     customer information.
     """
+
+    # --------------------------------------------------------
+    # DETECT CUSTOMER LANGUAGE
+    # --------------------------------------------------------
+
+    customer.language = detect_language(
+        message
+    )
+
+    # --------------------------------------------------------
+    # EXTRACT CUSTOMER INFORMATION
+    # --------------------------------------------------------
 
     extracted = extract_information_with_ai(
         message
@@ -104,3 +117,24 @@ def update_customer_card_from_message(
         )
 
     return extracted
+
+# ============================================================
+# COMPATIBILITY ALIAS
+# ============================================================
+
+def process_message_with_ai(
+    customer: CustomerCard,
+    message: str
+) -> dict:
+    """
+    Compatibility entry point used by the AI conversation
+    and Aylin engine modules.
+
+    The actual extraction/update logic remains centralized
+    in update_customer_card_from_message().
+    """
+
+    return update_customer_card_from_message(
+        customer,
+        message
+    )

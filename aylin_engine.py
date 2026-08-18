@@ -2,6 +2,8 @@ from customer_card import CustomerCard
 from ai_card_updater import process_message_with_ai
 from stage_manager import process_stage
 from required_information import get_missing_information
+from decision_engine import make_business_decision
+from decision_response import generate_decision_response
 
 
 def customer_card_to_dict(customer: CustomerCard) -> dict:
@@ -94,12 +96,93 @@ def process_customer_message(
 
     if stage_result["status"] == "stage_completed":
 
+        # -----------------------------------------------------
+        # The information collection stage is complete.
+        # Now run the deterministic business policy.
+        # -----------------------------------------------------
+
+        decision_result = make_business_decision(
+            customer
+        )
+
+        decision = decision_result.get(
+            "decision"
+        )
+
+        reason = decision_result.get(
+            "reason"
+        )
+
+        # -----------------------------------------------------
+        # Store decision on customer card
+        # -----------------------------------------------------
+
+        customer.decision = decision
+        customer.decision_reason = reason
+
+        customer.errors = list(
+            decision_result.get(
+                "errors",
+                []
+            )
+        )
+
+        # -----------------------------------------------------
+        # Determine final application stage
+        # -----------------------------------------------------
+
+        if decision == "approved":
+
+            customer.stage = "approved"
+
+            status = "decision_ready"
+
+        elif decision == "rejected":
+
+            customer.stage = "rejected"
+
+            status = "decision_ready"
+
+        elif decision == "manual_review":
+
+            customer.stage = "manual_review"
+
+            status = "decision_ready"
+
+        else:
+
+            # Unexpected/pending result.
+            customer.stage = "processing_application"
+
+            status = "processing_application"
+
+        # -----------------------------------------------------
+        # Generate customer-facing response
+        # -----------------------------------------------------
+
+        response = generate_decision_response(
+            decision_result,
+            customer
+        )
+
         return {
-            "status": "stage_completed",
-            "response": "Спасибо. Вся необходимая информация получена.",
+            "status": status,
+            "response": response,
             "next_field": None,
             "stage": customer.stage,
-            "extracted_information": extracted_information
+            "decision": decision,
+            "decision_reason": reason,
+            "errors": customer.errors,
+            "loan_to_value":
+                decision_result.get(
+                    "loan_to_value"
+                ),
+            "loan_to_value_percent":
+                decision_result.get(
+                    "loan_to_value_percent"
+                ),
+            "extracted_information":
+                extracted_information
         }
 
     # ---------------------------------------------------------
