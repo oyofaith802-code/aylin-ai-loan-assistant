@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from sqlalchemy import (
+    inspect,
+    text,
     create_engine,
     Column,
     String,
@@ -136,6 +138,11 @@ class Application(Base):
         nullable=True
     )
 
+    loan_term_months = Column(
+        Integer,
+        nullable=True
+    )
+
     vehicle_possession = Column(
         String,
         nullable=True
@@ -157,6 +164,16 @@ class Application(Base):
         String,
         nullable=False,
         default="new"
+    )
+
+    # ========================================================
+    # INTRODUCTION STATE
+    # ========================================================
+
+    introduced = Column(
+        Integer,
+        nullable=False,
+        default=0
     )
 
     # ========================================================
@@ -263,6 +280,40 @@ def create_application_table():
         bind=engine
     )
 
+    # --------------------------------------------------------
+    # Safe migration for existing databases
+    # --------------------------------------------------------
+
+    inspector = inspect(engine)
+
+    existing_columns = {
+        column["name"]
+        for column in inspector.get_columns(
+            "applications"
+        )
+    }
+
+    with engine.begin() as connection:
+
+        if "introduced" not in existing_columns:
+
+            connection.execute(
+                text(
+                    "ALTER TABLE applications "
+                    "ADD COLUMN introduced INTEGER "
+                    "NOT NULL DEFAULT 0"
+                )
+            )
+
+        if "loan_term_months" not in existing_columns:
+
+            connection.execute(
+                text(
+                    "ALTER TABLE applications "
+                    "ADD COLUMN loan_term_months INTEGER"
+                )
+            )
+
 
 # ============================================================
 # SAVE CUSTOMER
@@ -341,6 +392,14 @@ def save_customer(
             customer.loan_program
         )
 
+        application.loan_term_months = (
+            getattr(
+                customer,
+                "loan_term_months",
+                None
+            )
+        )
+
         application.vehicle_possession = (
             customer.vehicle_possession
         )
@@ -359,6 +418,18 @@ def save_customer(
 
         application.stage = (
             customer.stage
+        )
+
+        # ----------------------------------------------------
+        # Introduction state
+        # ----------------------------------------------------
+
+        application.introduced = (
+            1 if getattr(
+                customer,
+                "introduced",
+                False
+            ) else 0
         )
 
         # ----------------------------------------------------

@@ -54,6 +54,12 @@ def application_to_customer_card(
         loan_amount=application.loan_amount,
         loan_program=application.loan_program,
 
+        loan_term_months=getattr(
+            application,
+            "loan_term_months",
+            None
+        ),
+
         vehicle_possession=getattr(
             application,
             "vehicle_possession",
@@ -64,13 +70,15 @@ def application_to_customer_card(
             application.registration_region
         ),
 
-        loan_term_months=getattr(
-            application,
-            "loan_term_months",
-            None
-        ),
-
         stage=application.stage,
+
+        introduced=bool(
+            getattr(
+                application,
+                "introduced",
+                0
+            )
+        ),
 
         decision=getattr(
             application,
@@ -398,6 +406,45 @@ def process_persistent_message(
     response_text = result.get(
         "response"
     )
+
+    # --------------------------------------------------------
+    # FIRST-CONTACT INTRODUCTION
+    # --------------------------------------------------------
+    #
+    # Aylin introduces herself only once.
+    #
+    # The application pipeline still processes the customer's
+    # first message normally, so information supplied in that
+    # first message is not lost.
+    # --------------------------------------------------------
+
+    if not customer.introduced:
+
+        introduction = (
+            "Здравствуйте! Я Айлин, менеджер "
+            "автоломбарда «Молодой». "
+            "Готова помочь Вам с оформлением займа."
+        )
+
+        if response_text:
+
+            response_text = (
+                introduction
+                + "\n\n"
+                + response_text
+            )
+
+        else:
+
+            response_text = introduction
+
+        customer.introduced = True
+
+        # Persist the flag immediately so a reload does not
+        # introduce Aylin again.
+        save_customer(
+            customer
+        )
 
     if response_text:
         save_conversation_message(

@@ -1053,6 +1053,62 @@ def _extract_car_model(
 
     text = _clean_text(text)
 
+    # --------------------------------------------------------
+    # REMOVE GREETING PREFIXES BEFORE ANY MODEL EXTRACTION
+    #
+    # Greetings must never become part of car_model.
+    #
+    # Examples:
+    #   "Здравствуйте"
+    #       -> None
+    #
+    #   "Здравствуйте Toyota Camry 2021 года"
+    #       -> "Toyota Camry 2021 года"
+    #
+    #   "Салам Toyota Camry 2021 года"
+    #       -> "Toyota Camry 2021 года"
+    # --------------------------------------------------------
+
+    greeting_prefixes = [
+        "здравствуйте",
+        "здравствуй",
+        "добрый день",
+        "доброе утро",
+        "добрый вечер",
+        "привет",
+        "салам",
+        "саламатсызбы",
+    ]
+
+    lower_text = text.lower().strip()
+
+    # Message is only a greeting.
+    if lower_text in greeting_prefixes:
+        return None
+
+    # Remove greeting followed by whitespace or punctuation.
+    for greeting in greeting_prefixes:
+
+        pattern = (
+            rf"^{re.escape(greeting)}"
+            rf"(?:\s+|[,!?.:]+\s*)"
+        )
+
+        cleaned = re.sub(
+            pattern,
+            "",
+            text,
+            count=1,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        if cleaned != text.strip():
+            text = cleaned
+            break
+
+    if not text:
+        return None
+
     patterns = [
 
         # "Это BYD Song Plus"
@@ -1203,6 +1259,58 @@ def _extract_car_model(
     lower_text = text.lower().strip()
 
     # --------------------------------------------------------
+    # REMOVE GREETING PREFIXES
+    #
+    # Greetings are conversational text, not car models.
+    #
+    # Examples:
+    #   "Здравствуйте"
+    #       -> None
+    #
+    #   "Здравствуйте Toyota Camry 2021 года"
+    #       -> "Toyota Camry 2021 года"
+    #
+    #   "Добрый день, Toyota Camry"
+    #       -> "Toyota Camry"
+    # --------------------------------------------------------
+
+    greeting_prefixes = [
+        "здравствуйте",
+        "здравствуй",
+        "добрый день",
+        "доброе утро",
+        "добрый вечер",
+        "привет",
+        "салам",
+        "саламатсызбы",
+    ]
+
+    for greeting in greeting_prefixes:
+
+        if lower_text == greeting:
+            return None
+
+        greeting_pattern = (
+            rf"^{re.escape(greeting)}"
+            rf"(?:\\s+|[,!?.:]\\s*)"
+        )
+
+        cleaned_text = re.sub(
+            greeting_pattern,
+            "",
+            text,
+            count=1,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        if cleaned_text != text.strip():
+
+            text = cleaned_text
+            lower_text = text.lower().strip()
+
+            break
+
+    # --------------------------------------------------------
     # ORDINARY CONVERSATIONAL SENTENCES MUST NEVER
     # BECOME CAR MODELS
     # --------------------------------------------------------
@@ -1288,13 +1396,55 @@ def _extract_car_model(
         if phrase in lower_text:
             return None
 
+    # Remove common greetings before checking the bare answer.
+    #
+    # Examples:
+    #   "Здравствуйте Toyota Camry 2021 года"
+    #       -> "Toyota Camry 2021 года"
+    #
+    #   "Здравствуйте"
+    #       -> empty -> not a car model
+    #
+    # This prevents greetings from being stored as part of car_model.
+    greeting_prefixes = [
+        "здравствуйте",
+        "здравствуй",
+        "добрый день",
+        "доброе утро",
+        "добрый вечер",
+        "привет",
+        "салам",
+        "саламатсызбы",
+    ]
+
+    bare = text.strip()
+
+    for greeting in greeting_prefixes:
+
+        pattern = (
+            rf"^{re.escape(greeting)}"
+            rf"(?:[,!?.:]|\\s)+"
+        )
+
+        cleaned = re.sub(
+            pattern,
+            "",
+            bare,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
+        if cleaned != bare:
+            bare = cleaned.strip()
+            break
+
     # Remove year + Russian/Kyrgyz year suffix.
     bare = re.sub(
         r"\b(?:19\d{2}|20\d{2})"
         r"\s*[-–—]?\s*"
         r"(?:года|год|г\.?|жылкы|жыл)?\b",
         "",
-        text,
+        bare,
         flags=re.IGNORECASE,
     )
 

@@ -54,11 +54,9 @@ class CustomerCard:
 
     stage: str = "new"
 
-    # Customer conversation language.
-    # Supported values:
-    #   russian
-    #   kyrgyz
-    language: str = "russian"
+    # Whether Aylin has already introduced herself
+    # to this customer.
+    introduced: bool = False
 
     decision: Optional[str] = None
     decision_reason: Optional[str] = None
@@ -108,7 +106,7 @@ class CustomerCard:
 
             "stage": self.stage,
 
-            "language": self.language,
+            "introduced": self.introduced,
 
             "decision": self.decision,
             "decision_reason": self.decision_reason,
@@ -221,6 +219,12 @@ class CustomerCard:
                 "new",
             ),
 
+            introduced=bool(
+                data.get(
+                    "introduced",
+                    False,
+                )
+            ),
 
             decision=data.get(
                 "decision"
