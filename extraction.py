@@ -143,6 +143,71 @@ def _normalize_number(value: Any) -> Optional[float]:
 
 
 # ============================================================
+# NATURAL RUSSIAN MONEY EXTRACTION
+# ============================================================
+
+def _extract_natural_money(text: str) -> Optional[float]:
+    """
+    Handles natural Russian money expressions such as:
+
+        миллион двести
+        миллион двести тысяч
+        тысяч 500
+        тысячи 500
+        500 тысяч
+    """
+
+    text = _clean_text(text).lower()
+
+    # --------------------------------------------------------
+    # "миллион двести" -> 1,200,000
+    # --------------------------------------------------------
+
+    match = re.search(
+        r"\bмиллион(?:а|ов)?\s+"
+        r"(сто|двести|триста|четыреста|пятьсот|"
+        r"шестьсот|семьсот|восемьсот|девятьсот)"
+        r"(?:\s+(тысяч|тысяча|тысячи))?\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if match:
+        hundreds = {
+            "сто": 100,
+            "двести": 200,
+            "триста": 300,
+            "четыреста": 400,
+            "пятьсот": 500,
+            "шестьсот": 600,
+            "семьсот": 700,
+            "восемьсот": 800,
+            "девятьсот": 900,
+        }
+
+        return 1_000_000 + hundreds[match.group(1).lower()] * 1_000
+
+    # --------------------------------------------------------
+    # "тысяч 500" / "тысячи 500" -> 500,000
+    # --------------------------------------------------------
+
+    match = re.search(
+        r"\b(?:тысяч|тысяча|тысячи)\s+"
+        r"(\d+(?:[.,]\d+)?)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if match:
+        try:
+            return float(match.group(1).replace(",", ".")) * 1_000
+        except ValueError:
+            pass
+
+    return None
+
+
+# ============================================================
 # MONEY PATTERN
 # ============================================================
 
@@ -190,6 +255,31 @@ def _extract_loan_amount(
 ) -> Optional[float]:
 
     text = _clean_text(text)
+
+    # If the message clearly describes the vehicle's price/value,
+    # do not interpret that amount as the requested loan amount.
+    if re.search(
+        r"машин|автомобил|стоит|цена|стоимость|по деньгам",
+        text,
+        flags=re.IGNORECASE,
+    ) and not re.search(
+        r"получить|хочу|хотим|нужно|нужен|займ|сумма",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return None
+
+    natural_money = _extract_natural_money(text)
+
+    if natural_money is not None and natural_money > 0:
+        # Only use the natural form here when the message clearly
+        # expresses a requested loan amount.
+        if re.search(
+            r"получить|хочу|хотим|нужно|нужен|получить",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            return natural_money
 
     # --------------------------------------------------------
     # STRONG LOAN REQUEST PATTERNS
@@ -672,6 +762,37 @@ def _extract_car_value(
 ) -> Optional[float]:
 
     text = _clean_text(text)
+
+    # Natural expressions such as:
+    # "машина где-то миллион двести стоит"
+    natural_money = _extract_natural_money(text)
+
+    if natural_money is not None and natural_money > 0:
+        if re.search(
+            r"машин|автомобил|стоит|цена|стоимость|по деньгам",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            return natural_money
+
+    # Explicit scaled car value:
+    # "Машина стоит 1.5 млн сом" -> 1500000
+    car_scaled_match = re.search(
+        r"\b(\d+(?:[.,]\d+)?)\s*"
+        r"(?:млн\.?|миллион(?:а|ов)?)"
+        r"(?:\s+(?:сом|сома|сомов))?\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if car_scaled_match and re.search(
+        r"машин|автомобил|стоит|цена|стоимость|по деньгам",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return float(
+            car_scaled_match.group(1).replace(",", ".")
+        ) * 1_000_000
 
     patterns = [
 
