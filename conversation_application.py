@@ -788,6 +788,10 @@ def get_next_required_field(
     customer: CustomerCard
 ):
 
+    # ---------------------------------------------------------
+    # VEHICLE
+    # ---------------------------------------------------------
+
     if not customer.car_model:
         return "car_model"
 
@@ -797,14 +801,36 @@ def get_next_required_field(
     if customer.car_value is None:
         return "car_value"
 
+    # ---------------------------------------------------------
+    # LOAN
+    # ---------------------------------------------------------
+
     if customer.loan_amount is None:
         return "loan_amount"
+
+    if not customer.loan_program:
+        return "loan_program"
+
+    # ---------------------------------------------------------
+    # VEHICLE POSSESSION
+    # ---------------------------------------------------------
 
     if customer.vehicle_possession is None:
         return "vehicle_possession"
 
+    # ---------------------------------------------------------
+    # CUSTOMER
+    # ---------------------------------------------------------
+
     if not customer.registration_region:
         return "registration_region"
+
+    # ---------------------------------------------------------
+    # LOAN TERM
+    # ---------------------------------------------------------
+
+    if customer.loan_term_months is None:
+        return "loan_term_months"
 
     return None
 
@@ -819,16 +845,16 @@ def get_question_for_field(
     questions = {
 
         "car_model":
-            "Какая у вас модель автомобиля?",
+            "Подскажите, пожалуйста, модель автомобиля.",
 
         "car_year":
-            "Какого года ваш автомобиль?",
+            "Подскажите, пожалуйста, год выпуска автомобиля.",
 
         "car_value":
-            "Какова примерная стоимость автомобиля?",
+            "Подскажите, пожалуйста, примерную стоимость автомобиля.",
 
         "loan_amount":
-            "Какую сумму займа вы хотите получить?",
+            "Подскажите, пожалуйста, какую сумму займа вы хотите получить.",
 
         "vehicle_possession":
             (
@@ -1268,7 +1294,7 @@ def process_conversation_message(
     # Example:
     #
     # Aylin:
-    #   "Какова примерная стоимость автомобиля?"
+    #   "Подскажите, пожалуйста, примерную стоимость автомобиля."
     #
     # Customer:
     #   "20 тыс долларов"
@@ -1278,7 +1304,7 @@ def process_conversation_message(
     # Likewise:
     #
     # Aylin:
-    #   "Какую сумму займа вы хотите получить?"
+    #   "Подскажите, пожалуйста, какую сумму займа вы хотите получить."
     #
     # Customer:
     #   "500 тыс сом"
