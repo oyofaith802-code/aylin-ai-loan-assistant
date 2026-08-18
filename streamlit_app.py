@@ -1,17 +1,18 @@
 import streamlit as st
 import requests
 import time
+import pandas as pd
 
 
 API_URL = "https://aylin-ai-loan-assistant.onrender.com"
 
 
 # ============================================================
-# PAGE
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
-    page_title="Aylin — Тестирование",
+    page_title="Aylin — AI Control Center",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -19,7 +20,7 @@ st.set_page_config(
 
 
 # ============================================================
-# SESSION
+# SESSION STATE
 # ============================================================
 
 defaults = {
@@ -27,10 +28,15 @@ defaults = {
     "application_id": None,
     "messages": [],
     "page": "Диалог",
+    "audio_history": [],
+    "csv_data": None,
+    "selected_message": None,
 }
 
 for key, value in defaults.items():
+
     if key not in st.session_state:
+
         st.session_state[key] = value
 
 
@@ -41,24 +47,29 @@ for key, value in defaults.items():
 def api_get(endpoint):
 
     try:
+
         response = requests.get(
             f"{API_URL}{endpoint}",
             timeout=30,
         )
 
         response.raise_for_status()
+
         return response.json()
 
-    except requests.RequestException:
-        return None
+    except Exception as error:
 
-    except Exception:
+        st.error(
+            f"API error: {error}"
+        )
+
         return None
 
 
 def get_customer():
 
     if not st.session_state.phone:
+
         return None
 
     return api_get(
@@ -66,10 +77,18 @@ def get_customer():
     )
 
 
+# ============================================================
+# RESET CLIENT
+# ============================================================
+
 def reset_client():
 
-    st.session_state.messages = []
+    st.session_state.phone = ""
     st.session_state.application_id = None
+    st.session_state.messages = []
+    st.session_state.audio_history = []
+    st.session_state.csv_data = None
+    st.session_state.selected_message = None
     st.session_state.page = "Диалог"
 
 
@@ -79,100 +98,147 @@ def reset_client():
 
 def show_customer_card(customer):
 
-    st.subheader("👤 Карточка клиента")
+    st.subheader("👤 Customer Card")
 
     if not customer:
 
         st.info(
-            "После первого сообщения здесь появится "
-            "информация о клиенте."
+            "Customer information will appear here "
+            "after the first message."
         )
 
         return
 
+
+    customer = customer.get(
+        "customer",
+        customer
+    )
+
+
     fields = [
 
-        ("car_model", "Модель автомобиля"),
+        ("car_model", "🚗 Vehicle model"),
 
-        ("car_year", "Год выпуска"),
+        ("car_year", "📅 Year"),
 
-        ("car_value", "Стоимость автомобиля"),
+        ("car_value", "💰 Vehicle value"),
 
-        ("loan_amount", "Сумма займа"),
+        ("loan_amount", "💵 Loan amount"),
 
-        ("loan_program", "Программа займа"),
+        ("loan_program", "📋 Loan program"),
 
-        ("loan_term_months", "Срок займа"),
+        ("loan_term_months", "⏱ Loan term"),
 
-        ("vehicle_possession", "Условия хранения автомобиля"),
+        ("vehicle_possession", "🔐 Vehicle possession"),
 
-        ("registration_region", "Регион регистрации"),
+        ("registration_region", "📍 Registration region"),
 
-        ("stage", "Этап"),
+        ("stage", "⚙️ Stage"),
 
     ]
+
 
     for key, label in fields:
 
         value = customer.get(key)
 
-        if value is None or value == "":
-            value = "Не указано"
+
+        if value in (None, ""):
+
+            display_value = "Not specified"
+
+        else:
+
+            display_value = value
+
 
         if key in (
             "car_value",
             "loan_amount",
-        ) and value != "Не указано":
+        ):
 
-            try:
-                value = (
-                    f"{float(value):,.0f}"
-                    .replace(",", " ")
-                    + " сом"
+            if value not in (None, ""):
+
+                try:
+
+                    display_value = (
+                        f"{float(value):,.0f}"
+                        .replace(",", " ")
+                        + " сом"
+                    )
+
+                except Exception:
+
+                    display_value = value
+
+
+        if key == "loan_term_months":
+
+            if value not in (None, ""):
+
+                display_value = (
+                    f"{value} months"
                 )
-            except Exception:
-                pass
 
-        if key == "loan_term_months" and value != "Не указано":
-
-            value = f"{value} мес."
 
         if key == "vehicle_possession":
 
             if value == "customer":
-                value = "Автомобиль остаётся у клиента"
+
+                display_value = (
+                    "Vehicle remains with customer"
+                )
 
             elif value == "lender":
-                value = "Охраняемая стоянка"
+
+                display_value = (
+                    "Secure parking"
+                )
+
 
         st.markdown(
             f"""
             <div style="
-                padding:10px;
-                margin-bottom:6px;
-                border:1px solid #ddd;
-                border-radius:8px;
+                padding:12px;
+                margin-bottom:7px;
+                border:1px solid #e5e7eb;
+                border-radius:10px;
+                background:#fafafa;
             ">
-                <div style="font-size:13px;color:#777;">
+                <div style="
+                    font-size:12px;
+                    color:#6b7280;
+                ">
                     {label}
                 </div>
-                <div style="font-size:16px;font-weight:600;">
-                    {value}
+
+                <div style="
+                    font-size:16px;
+                    font-weight:600;
+                    margin-top:3px;
+                ">
+                    {display_value}
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+
     st.divider()
+
 
     application_id = customer.get(
         "application_id"
     )
 
+
     if application_id:
 
-        st.caption("Номер заявки")
+        st.caption(
+            "Application ID"
+        )
 
         st.code(
             application_id
@@ -188,29 +254,36 @@ with st.sidebar:
     st.title("🤖 Aylin")
 
     st.caption(
-        "AI-помощник по оформлению займа"
+        "AI Loan Assistant — Testing Center"
     )
 
     st.divider()
 
-    st.subheader("Тестовый клиент")
+
+    # --------------------------------------------------------
+    # CLIENT
+    # --------------------------------------------------------
+
+    st.subheader("👤 Test Client")
 
     phone = st.text_input(
-        "Номер телефона",
+        "Phone number",
         value=st.session_state.phone,
         placeholder="996555123456",
     )
 
     st.session_state.phone = phone.strip()
 
+
     st.divider()
+
 
     # --------------------------------------------------------
     # NEW CLIENT
     # --------------------------------------------------------
 
     if st.button(
-        "➕ Новый клиент",
+        "➕ New Client",
         use_container_width=True,
         type="primary",
     ):
@@ -219,12 +292,19 @@ with st.sidebar:
 
         st.rerun()
 
+
     st.divider()
 
-    st.subheader("Разделы")
+
+    # --------------------------------------------------------
+    # NAVIGATION
+    # --------------------------------------------------------
+
+    st.subheader("Navigation")
+
 
     if st.button(
-        "💬 Диалог",
+        "💬 Conversation",
         use_container_width=True,
     ):
 
@@ -232,8 +312,9 @@ with st.sidebar:
 
         st.rerun()
 
+
     if st.button(
-        "📋 Карточка клиента",
+        "👤 Customer Card",
         use_container_width=True,
     ):
 
@@ -241,8 +322,9 @@ with st.sidebar:
 
         st.rerun()
 
+
     if st.button(
-        "📜 История диалога",
+        "📜 Previous Chats",
         use_container_width=True,
     ):
 
@@ -250,8 +332,9 @@ with st.sidebar:
 
         st.rerun()
 
+
     if st.button(
-        "🗂 История заявок",
+        "🗂 Applications",
         use_container_width=True,
     ):
 
@@ -259,8 +342,29 @@ with st.sidebar:
 
         st.rerun()
 
+
     if st.button(
-        "🔗 Состояние системы",
+        "🎙️ Audio",
+        use_container_width=True,
+    ):
+
+        st.session_state.page = "Аудио"
+
+        st.rerun()
+
+
+    if st.button(
+        "📊 CSV",
+        use_container_width=True,
+    ):
+
+        st.session_state.page = "CSV"
+
+        st.rerun()
+
+
+    if st.button(
+        "🔗 System Status",
         use_container_width=True,
     ):
 
@@ -269,22 +373,31 @@ with st.sidebar:
         st.rerun()
 
 
+    st.divider()
+
+    st.caption(
+        "Aylin Testing Center"
+    )
+
+
 # ============================================================
-# DIALOG
+# CONVERSATION
 # ============================================================
 
 if st.session_state.page == "Диалог":
 
-    st.title("💬 Тестирование Aylin")
+    st.title("💬 Aylin Conversation")
 
     st.caption(
-        "Проверьте реальный сценарий общения с клиентом. "
-        "Карточка клиента обновляется после каждого сообщения."
+        "Test real customer conversations while watching "
+        "the customer card update."
     )
+
 
     left, right = st.columns(
         [1.55, 1]
     )
+
 
     # ========================================================
     # CHAT
@@ -292,34 +405,39 @@ if st.session_state.page == "Диалог":
 
     with left:
 
-        st.subheader("Диалог")
+        st.subheader("Conversation")
+
 
         if not st.session_state.phone:
 
             st.info(
-                "Введите номер телефона клиента слева, "
-                "затем начните диалог."
+                "Enter a customer phone number in the sidebar."
             )
+
 
         if not st.session_state.messages:
 
             st.markdown(
                 """
-                **Начните тестирование**
+### Start a test
 
-                Например:
+Try a complete customer message:
 
-                > Здравствуйте, хочу получить займ под автомобиль.
+> У меня Toyota Camry 2021 года, стоимость примерно
+> 1500000 сом, хочу получить 500000 сом
 
-                Или сразу передайте несколько данных:
-
-                > У меня Toyota Camry 2021 года, машина стоит
-                > примерно 1 500 000 сом, хочу получить
-                > 500 000 сом.
+Or test a natural conversation step by step.
                 """
             )
 
-        for message in st.session_state.messages:
+
+        # ----------------------------------------------------
+        # MESSAGE HISTORY
+        # ----------------------------------------------------
+
+        for index, message in enumerate(
+            st.session_state.messages
+        ):
 
             if message["role"] == "user":
 
@@ -343,39 +461,39 @@ if st.session_state.page == "Диалог":
                         message["content"]
                     )
 
+
+        # ----------------------------------------------------
+        # CHAT INPUT
+        # ----------------------------------------------------
+
         user_message = st.chat_input(
-            "Введите сообщение клиента..."
+            "Type customer message..."
         )
+
 
         if user_message:
 
             if not st.session_state.phone:
 
                 st.warning(
-                    "Сначала укажите номер телефона клиента."
+                    "Enter the customer's phone number first."
                 )
 
                 st.stop()
 
+
             # ------------------------------------------------
-            # SHOW CLIENT MESSAGE
+            # CLIENT MESSAGE
             # ------------------------------------------------
 
             st.session_state.messages.append(
                 {
                     "role": "user",
                     "content": user_message,
+                    "timestamp": time.time(),
                 }
             )
 
-            with st.chat_message(
-                "user",
-                avatar="👤",
-            ):
-
-                st.write(
-                    user_message
-                )
 
             payload = {
 
@@ -390,90 +508,69 @@ if st.session_state.page == "Диалог":
 
             }
 
+
             # ------------------------------------------------
-            # SEND TO API
+            # API
             # ------------------------------------------------
 
-            with st.chat_message(
-                "assistant",
-                avatar="🤖",
-            ):
+            try:
 
                 with st.spinner(
-                    "Aylin обрабатывает сообщение..."
+                    "Aylin is analyzing the message..."
                 ):
 
-                    try:
+                    response = requests.post(
 
-                        response = requests.post(
+                        f"{API_URL}/conversation/message",
 
-                            f"{API_URL}/conversation/message",
+                        json=payload,
 
-                            json=payload,
+                        timeout=90,
 
-                            timeout=90,
+                    )
 
-                        )
 
-                        response.raise_for_status()
+                response.raise_for_status()
 
-                        data = response.json()
+                data = response.json()
 
-                        st.session_state.application_id = (
 
-                            data.get(
-                                "application_id"
-                            )
-                            or
-                            st.session_state.application_id
-                        )
+                st.session_state.application_id = (
 
-                        aylin_response = data.get(
-                            "response",
-                            "Не удалось получить ответ от Aylin.",
-                        )
+                    data.get(
+                        "application_id"
+                    )
 
-                        time.sleep(0.2)
+                    or
 
-                        st.write(
-                            aylin_response
-                        )
+                    st.session_state.application_id
+                )
 
-                        st.session_state.messages.append(
-                            {
-                                "role":
-                                    "assistant",
 
-                                "content":
-                                    aylin_response,
-                            }
-                        )
+                aylin_response = data.get(
+                    "response",
+                    "Aylin did not return a response.",
+                )
 
-                    except requests.RequestException as error:
 
-                        st.error(
-                            "Не удалось подключиться к Aylin API."
-                        )
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": aylin_response,
+                        "timestamp": time.time(),
+                    }
+                )
 
-                        st.caption(
-                            str(error)
-                        )
 
-                    except Exception as error:
+                st.rerun()
 
-                        st.error(
-                            "Произошла ошибка при обработке сообщения."
-                        )
 
-                        st.caption(
-                            str(error)
-                        )
+            except Exception as error:
 
-            # ------------------------------------------------
-            # REFRESH PAGE
-            # ------------------------------------------------
+                st.error(
+                    f"Could not contact Aylin API: {error}"
+                )
 
-            st.rerun()
 
     # ========================================================
     # CUSTOMER CARD
@@ -489,76 +586,73 @@ if st.session_state.page == "Диалог":
 
 
 # ============================================================
-# CUSTOMER CARD PAGE
+# CUSTOMER CARD
 # ============================================================
 
 elif st.session_state.page == "Карточка клиента":
 
-    st.title("👤 Карточка клиента")
+    st.title("👤 Customer Card")
 
     st.caption(
-        "Все данные, которые Aylin уже собрала."
+        "Information collected by Aylin."
     )
 
-    if not st.session_state.phone:
 
-        st.info(
-            "Введите номер телефона клиента."
+    customer_data = get_customer()
+
+
+    if customer_data:
+
+        show_customer_card(
+            customer_data
         )
 
     else:
 
-        customer_data = get_customer()
-
-        if customer_data:
-
-            customer = customer_data.get(
-                "customer",
-                customer_data
-            )
-
-            show_customer_card(
-                customer
-            )
-
-        else:
-
-            st.info(
-                "Для этого номера пока нет активной заявки."
-            )
+        st.info(
+            "No active application found for this customer."
+        )
 
 
 # ============================================================
-# CONVERSATION HISTORY
+# PREVIOUS CHATS
 # ============================================================
 
 elif st.session_state.page == "История диалога":
 
-    st.title("📜 История диалога")
+    st.title("📜 Conversation History")
+
+    st.caption(
+        "Messages from the current testing session."
+    )
+
 
     if not st.session_state.messages:
 
         st.info(
-            "В текущем тестовом диалоге пока нет сообщений."
+            "No messages yet."
         )
 
     else:
 
-        for message in st.session_state.messages:
+        for index, message in enumerate(
+            st.session_state.messages
+        ):
 
-            if message["role"] == "user":
+            role = (
+                "👤 Customer"
+                if message["role"] == "user"
+                else "🤖 Aylin"
+            )
 
-                st.markdown(
-                    f"**👤 Клиент:** {message['content']}"
+
+            with st.expander(
+                f"{role} — Message {index + 1}"
+            ):
+
+                st.write(
+                    message["content"]
                 )
-
-            else:
-
-                st.markdown(
-                    f"**🤖 Aylin:** {message['content']}"
-                )
-
-            st.divider()
 
 
 # ============================================================
@@ -567,12 +661,17 @@ elif st.session_state.page == "История диалога":
 
 elif st.session_state.page == "История заявок":
 
-    st.title("🗂 История заявок")
+    st.title("🗂 Applications")
+
+    st.caption(
+        "Previous applications associated with this client."
+    )
+
 
     if not st.session_state.phone:
 
         st.info(
-            "Введите номер телефона клиента."
+            "Enter a customer phone number."
         )
 
     else:
@@ -581,43 +680,265 @@ elif st.session_state.page == "История заявок":
             f"/applications/history/{st.session_state.phone}"
         )
 
-        if not data:
 
-            st.warning(
-                "Не удалось получить историю заявок."
-            )
-
-        else:
+        if data:
 
             applications = data.get(
                 "applications",
                 []
             )
 
-            if not applications:
 
-                st.info(
-                    "У клиента пока нет истории заявок."
-                )
-
-            else:
-
-                st.write(
-                    f"Количество заявок: {len(applications)}"
-                )
+            if applications:
 
                 for application in applications:
 
+                    application_id = application.get(
+                        "application_id",
+                        "Application"
+                    )
+
+
                     with st.expander(
-                        application.get(
-                            "application_id",
-                            "Заявка"
-                        )
+                        application_id
                     ):
 
                         st.json(
                             application
                         )
+
+            else:
+
+                st.info(
+                    "No previous applications."
+                )
+
+
+# ============================================================
+# AUDIO
+# ============================================================
+
+elif st.session_state.page == "Аудио":
+
+    st.title("🎙️ Audio Testing")
+
+    st.caption(
+        "Test customer voice messages before connecting "
+        "speech-to-text to Aylin."
+    )
+
+
+    tab_record, tab_upload = st.tabs(
+        [
+            "🎙️ Record",
+            "📁 Upload",
+        ]
+    )
+
+
+    # ========================================================
+    # RECORD
+    # ========================================================
+
+    with tab_record:
+
+        st.subheader(
+            "Record customer audio"
+        )
+
+
+        audio_value = st.audio_input(
+            "Record a voice message"
+        )
+
+
+        if audio_value:
+
+            st.audio(
+                audio_value
+            )
+
+
+            st.success(
+                "Audio captured successfully."
+            )
+
+
+            st.download_button(
+                "⬇️ Save audio",
+                audio_value,
+                file_name="customer_voice.wav",
+                mime="audio/wav",
+                use_container_width=True,
+            )
+
+
+    # ========================================================
+    # UPLOAD
+    # ========================================================
+
+    with tab_upload:
+
+        st.subheader(
+            "Upload audio file"
+        )
+
+
+        uploaded_audio = st.file_uploader(
+
+            "Choose an audio file",
+
+            type=[
+                "wav",
+                "mp3",
+                "m4a",
+                "ogg",
+                "webm",
+            ],
+
+        )
+
+
+        if uploaded_audio:
+
+            st.audio(
+                uploaded_audio
+            )
+
+
+            st.success(
+                f"Loaded: {uploaded_audio.name}"
+            )
+
+
+            st.write(
+                f"File size: "
+                f"{uploaded_audio.size / 1024:.1f} KB"
+            )
+
+
+# ============================================================
+# CSV
+# ============================================================
+
+elif st.session_state.page == "CSV":
+
+    st.title("📊 CSV Testing")
+
+    st.caption(
+        "Upload customer data for testing and inspection."
+    )
+
+
+    uploaded_csv = st.file_uploader(
+
+        "Upload customer CSV",
+
+        type=[
+            "csv",
+        ],
+
+    )
+
+
+    if uploaded_csv:
+
+        try:
+
+            dataframe = pd.read_csv(
+                uploaded_csv
+            )
+
+
+            st.session_state.csv_data = dataframe
+
+
+            st.success(
+                f"Loaded {len(dataframe):,} records."
+            )
+
+
+            st.subheader(
+                "Dataset Preview"
+            )
+
+
+            st.dataframe(
+                dataframe.head(100),
+                use_container_width=True,
+                height=400,
+            )
+
+
+            st.subheader(
+                "Dataset Information"
+            )
+
+
+            metric1, metric2, metric3 = st.columns(3)
+
+
+            metric1.metric(
+                "Rows",
+                f"{len(dataframe):,}"
+            )
+
+
+            metric2.metric(
+                "Columns",
+                f"{len(dataframe.columns):,}"
+            )
+
+
+            metric3.metric(
+                "Missing values",
+                f"{int(dataframe.isna().sum().sum()):,}"
+            )
+
+
+            st.subheader(
+                "Columns"
+            )
+
+
+            column_data = pd.DataFrame(
+                {
+                    "Column":
+                        dataframe.columns,
+
+                    "Data type":
+                        [
+                            str(dtype)
+                            for dtype in dataframe.dtypes
+                        ],
+
+                    "Missing":
+                        [
+                            int(dataframe[col].isna().sum())
+                            for col in dataframe.columns
+                        ],
+                }
+            )
+
+
+            st.dataframe(
+                column_data,
+                use_container_width=True,
+            )
+
+
+        except Exception as error:
+
+            st.error(
+                f"Could not read CSV: {error}"
+            )
+
+
+    else:
+
+        st.info(
+            "Upload a CSV file to begin."
+        )
 
 
 # ============================================================
@@ -626,21 +947,25 @@ elif st.session_state.page == "История заявок":
 
 elif st.session_state.page == "Состояние системы":
 
-    st.title("🔗 Состояние системы")
+    st.title("🔗 System Status")
+
 
     st.write(
-        "Проверка доступности Aylin API."
+        "Checking Aylin API..."
     )
+
 
     health = api_get(
         "/health"
     )
 
+
     if health is not None:
 
         st.success(
-            "Aylin API работает"
+            "🟢 Aylin API is online"
         )
+
 
         st.json(
             health
@@ -649,22 +974,47 @@ elif st.session_state.page == "Состояние системы":
     else:
 
         st.error(
-            "Aylin API недоступен"
+            "🔴 Aylin API is unavailable"
         )
+
 
     st.divider()
 
-    st.write(
-        "**API:**"
+
+    col1, col2 = st.columns(2)
+
+
+    with col1:
+
+        st.metric(
+            "Messages in current session",
+            len(st.session_state.messages)
+        )
+
+
+    with col2:
+
+        st.metric(
+            "Current application",
+            st.session_state.application_id
+            or "None"
+        )
+
+
+    st.subheader(
+        "API"
     )
+
 
     st.code(
         API_URL
     )
 
-    st.write(
-        "**Основной endpoint:**"
+
+    st.subheader(
+        "Conversation endpoint"
     )
+
 
     st.code(
         "/conversation/message"
