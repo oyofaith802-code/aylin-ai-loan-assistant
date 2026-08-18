@@ -415,55 +415,14 @@ def extract_car_model(text):
             return value
 
     # --------------------------------------------------------
-    # Common standalone models
+    # Known brands + models
     #
-    # Customers often omit the manufacturer:
-    # "камри 21 года"
-    # "прадо 2020"
-    # "солярис 2019 года"
-    # --------------------------------------------------------
-
-    known_models = [
-        "камри",
-        "camry",
-        "прадо",
-        "prado",
-        "королла",
-        "corolla",
-        "рав4",
-        "rav4",
-        "солярис",
-        "solaris",
-        "акцент",
-        "accent",
-        "лансер",
-        "lancer",
-        "круз",
-        "cruze",
-        "нива",
-        "niva",
-        "патрол",
-        "patrol",
-        "лексус",
-        "lexus",
-        "джетта",
-        "jetta",
-        "пассат",
-        "passat",
-    ]
-
-    for model in known_models:
-        match = re.search(
-            rf"\b{re.escape(model)}\b",
-            text,
-            flags=re.IGNORECASE
-        )
-
-        if match:
-            return match.group(0)
-
-    # --------------------------------------------------------
-    # Known brands
+    # IMPORTANT:
+    # Check brand + model BEFORE standalone models.
+    #
+    # Example:
+    # "Toyota Camry" -> "Toyota Camry"
+    # not just "Camry"
     # --------------------------------------------------------
 
     known_brands = [
@@ -508,22 +467,57 @@ def extract_car_model(text):
             match.group(0)
         )
 
-        if not value:
-            continue
-
-        # Don't accidentally include loan/application words
-        value = re.split(
-            r"\b(?:хочу|хотим|нужн[оа]|получить|займ|"
-            r"стоимость|цена|под|автозалог|автозайм)\b",
-            value,
-            maxsplit=1,
-            flags=re.IGNORECASE
-        )[0].strip()
-
-        value = clean_car_model(value)
-
         if value and len(value.split()) <= 5:
             return value
+
+    # --------------------------------------------------------
+    # Common standalone models
+    #
+    # Customers often omit the manufacturer:
+    # "камри 21 года"
+    # "прадо 2020"
+    # "солярис 2019 года"
+    # --------------------------------------------------------
+
+    known_models = [
+        "камри",
+        "camry",
+        "прадо",
+        "prado",
+        "королла",
+        "corolla",
+        "рав4",
+        "rav4",
+        "солярис",
+        "solaris",
+        "акцент",
+        "accent",
+        "лансер",
+        "lancer",
+        "круз",
+        "cruze",
+        "нива",
+        "niva",
+        "патрол",
+        "patrol",
+        "лексус",
+        "lexus",
+        "джетта",
+        "jetta",
+        "пассат",
+        "passat",
+    ]
+
+    for model in known_models:
+
+        match = re.search(
+            rf"\b{re.escape(model)}\b",
+            text,
+            flags=re.IGNORECASE
+        )
+
+        if match:
+            return match.group(0)
 
     return None
 
