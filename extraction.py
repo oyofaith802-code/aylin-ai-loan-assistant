@@ -447,23 +447,22 @@ def _extract_loan_term(
 
     text = _clean_text(text)
 
+    # --------------------------------------------------------
+    # RUSSIAN NUMERIC MONTHS
+    # --------------------------------------------------------
+
     patterns = [
-
-        r"\bна\s+(\d+)\s+"
-        r"(?:месяц|месяца|месяцев)\b",
-
-        r"\b(\d+)\s+"
-        r"(?:месяц|месяца|месяцев)\b",
-
-        r"\bсрок(?:а)?\s*[:\-]?\s*"
-        r"(\d+)\s+"
-        r"(?:месяц|месяца|месяцев)\b",
-
+        r"\bна\s+(\d+)\s+(?:месяц|месяца|месяцев)\b",
+        r"\b(\d+)\s+(?:месяц|месяца|месяцев)\b",
+        r"\bсрок(?:а)?\s*[:\-]?\s*(\d+)\s+(?:месяц|месяца|месяцев)\b",
         r"\bсрок\s*[:\-]?\s*(\d+)\b",
     ]
 
-    # "на месяц" is a very common spoken form.
-    if re.search(r"\bна\s+месяц\b", text, flags=re.IGNORECASE):
+    if re.search(
+        r"\bна\s+месяц\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
         return 1
 
     for pattern in patterns:
@@ -478,13 +477,59 @@ def _extract_loan_term(
             continue
 
         try:
+            months = int(match.group(1))
 
-            if match.lastindex is None:
-                continue
+            if 1 <= months <= 120:
+                return months
 
-            months = int(
-                match.group(1)
-            )
+        except (ValueError, TypeError):
+            pass
+
+    # --------------------------------------------------------
+    # KYRGYZ YEARS
+    #
+    # Examples:
+    #   2 жылга алсам деп ойлоп жатам -> 24
+    #   3 жылга алгым келет -> 36
+    #   2 жылга -> 24
+    # --------------------------------------------------------
+
+    kyrgyz_year_match = re.search(
+        r"\b(\d+)\s*(?:жыл|жылга)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if kyrgyz_year_match:
+
+        try:
+            years = int(kyrgyz_year_match.group(1))
+            months = years * 12
+
+            if 1 <= months <= 120:
+                return months
+
+        except (ValueError, TypeError):
+            pass
+
+    # --------------------------------------------------------
+    # KYRGYZ MONTHS
+    #
+    # Examples:
+    #   24 айга алгым келет -> 24
+    #   12 айга -> 12
+    # --------------------------------------------------------
+
+    kyrgyz_month_match = re.search(
+        r"\b(\d+)\s*(?:ай|айга)\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if kyrgyz_month_match:
+
+        try:
+            months = int(kyrgyz_month_match.group(1))
 
             if 1 <= months <= 120:
                 return months
@@ -497,7 +542,6 @@ def _extract_loan_term(
     # --------------------------------------------------------
 
     word_numbers = {
-
         "один": 1,
         "два": 2,
         "три": 3,
@@ -1052,20 +1096,37 @@ def _extract_car_model(
 
         model = _clean_text(match.group(1))
 
+        # Remove year and its Russian/Kyrgyz suffix.
         model = re.sub(
-            r"\s+(?:года|год|г\.)\s*$",
+            r"\s*(?:19\d{2}|20\d{2})"
+            r"\s*[-–—]?\s*"
+            r"(?:года|год|г\.?|жылкы|жыл)?"
+            r"\s*$",
             "",
             model,
             flags=re.IGNORECASE,
         ).strip()
 
+        # Remove leftover suffixes.
         model = re.sub(
-            r"\s+(?:примерная стоимость|"
-            r"стоимость|цена|"
-            r"19\d{2}|20\d{2}).*$",
+            r"\s*[-–—]?\s*(?:жылкы|жыл|года|год|г\.?)\s*$",
             "",
             model,
             flags=re.IGNORECASE,
+        ).strip()
+
+        # Remove punctuation accidentally left before suffix.
+        model = re.sub(
+            r"\s*[-–—]\s*$",
+            "",
+            model,
+        ).strip()
+
+        # Remove trailing punctuation.
+        model = re.sub(
+            r"[.!?,:;]+$",
+            "",
+            model,
         ).strip()
 
         if _is_valid_car_model(model):
@@ -1075,18 +1136,105 @@ def _extract_car_model(
     # BARE CUSTOMER ANSWER
     #
     # Examples:
-    #   "Камри 2022 года"
-    #   "Toyota Camry 2021"
-    #   "Camry"
+    #   Камри 2022 года
+    #   Toyota Camry 2021
+    #   Camry
     #
-    # The year is extracted separately, so remove it here
-    # and treat the remaining text as the vehicle model.
+    # Do not treat ordinary conversational answers as models.
     # --------------------------------------------------------
 
+    conversational_car_model_exclusions = [
+
+        # Kyrgyz vehicle possession
+        "машинаны өзүмдө калтыргым келет",
+        "машинамды өзүмдө калтыргым келет",
+        "унааны өзүмдө калтыргым келет",
+        "унаамды өзүмдө калтыргым келет",
+        "машина өзүмдө калсын",
+        "машинам өзүмдө калсын",
+        "унаа өзүмдө калсын",
+        "унаам өзүмдө калсын",
+
+        # Russian vehicle possession
+        "машину хочу оставить у себя",
+        "машина останется у меня",
+        "автомобиль останется у меня",
+        "хочу оставить машину у себя",
+        "хочу оставить автомобиль у себя",
+
+        # Kyrgyz registration
+        "бишкекте катталгам",
+        "ошто катталгам",
+        "нарында катталгам",
+        "таласта катталгам",
+        "баткенде катталгам",
+        "чуйда катталгам",
+
+        # Russian registration
+        "зарегистрирован в бишкеке",
+        "зарегистрирована в бишкеке",
+        "зарегистрирован в ош",
+        "зарегистрирована в ош",
+    ]
+
+    # Kyrgyz registration phrases must never become car_model.
+    conversational_car_model_exclusions.extend([
+
+        "бишкекте катталганмын",
+        "ошто катталганмын",
+        "нарында катталганмын",
+        "таласта катталганмын",
+        "баткенде катталганмын",
+        "чуйда катталганмын",
+
+        "бишкекте катталгам",
+        "ошто катталгам",
+        "нарында катталгам",
+        "таласта катталгам",
+        "баткенде катталгам",
+        "чуйда катталгам",
+
+    ])
+
+    lower_text = text.lower().strip()
+
+    # Additional Kyrgyz loan-term conversational answers.
+    # These must never be interpreted as car models.
+    loan_term_patterns = [
+        r"\b\d+\s+жылга\b",
+        r"\b\d+\s+жыл\b",
+        r"\b\d+\s+айга\b",
+        r"\b\d+\s+ай\b",
+    ]
+
+    for pattern in loan_term_patterns:
+
+        if re.search(
+            pattern,
+            lower_text,
+            flags=re.IGNORECASE,
+        ):
+            return None
+
+    for phrase in conversational_car_model_exclusions:
+
+        if phrase in lower_text:
+            return None
+
+    # Remove year + Russian/Kyrgyz year suffix.
     bare = re.sub(
-        r"\b(?:19\d{2}|20\d{2})\s*(?:года|год|г\.)?\b",
+        r"\b(?:19\d{2}|20\d{2})"
+        r"\s*[-–—]?\s*"
+        r"(?:года|год|г\.?|жылкы|жыл)?\b",
         "",
         text,
+        flags=re.IGNORECASE,
+    )
+
+    bare = re.sub(
+        r"\s*[-–—]?\s*(?:жылкы|жыл|года|год|г\.?)\s*$",
+        "",
+        bare,
         flags=re.IGNORECASE,
     )
 
@@ -1205,6 +1353,24 @@ def _extract_vehicle_possession(
     # --------------------------------------------------------
 
     customer_patterns = [
+
+        # ----------------------------------------------------
+        # KYRGYZ — CUSTOMER KEEPS VEHICLE
+        # ----------------------------------------------------
+
+        "машинаны өзүмдө калтыргым келет",
+        "машинамды өзүмдө калтыргым келет",
+        "унааны өзүмдө калтыргым келет",
+        "унаамды өзүмдө калтыргым келет",
+
+        "машина өзүмдө калсын",
+        "машинам өзүмдө калсын",
+        "унаа өзүмдө калсын",
+        "унаам өзүмдө калсын",
+
+        "машинаны өзүмдө калтырам",
+        "машинамды өзүмдө калтырам",
+        "унаамды өзүмдө калтырам",
 
         # Short natural customer answer
         "нужен займ без изъятия",
@@ -1356,43 +1522,95 @@ def _extract_registration_region(
     # --------------------------------------------------------
 
     regions = {
+        # Bishkek
         "бишкек": "Бишкек",
         "бишкеке": "Бишкек",
+        "бишкекте": "Бишкек",
 
+        # Osh
         "ош": "Ош",
         "оше": "Ош",
+        "ошто": "Ош",
 
+        # Chuy
         "чуй": "Чуй",
+        "чуйда": "Чуй",
+        "чуйской": "Чуйская область",
         "чуйская область": "Чуйская область",
 
+        # Osh region
         "ошская область": "Ошская область",
 
+        # Issyk-Kul
         "иссык-куль": "Иссык-Куль",
         "иссык куль": "Иссык-Куль",
+        "иссык-куле": "Иссык-Куль",
         "иссык-кульская область": "Иссык-Кульская область",
 
+        # Naryn
         "нарын": "Нарын",
         "нарына": "Нарын",
+        "нарында": "Нарын",
         "нарынская область": "Нарынская область",
 
+        # Talas
         "талас": "Талас",
+        "таласта": "Талас",
         "таласская область": "Таласская область",
 
+        # Jalal-Abad
         "джалал-абад": "Джалал-Абад",
         "джалал абад": "Джалал-Абад",
+        "джалал-абадда": "Джалал-Абад",
         "джалал-абадская область": "Джалал-Абадская область",
 
+        # Batken
         "баткен": "Баткен",
+        "баткенде": "Баткен",
         "баткенская область": "Баткенская область",
     }
 
     # --------------------------------------------------------
-    # EXPLICIT REGION PHRASES
+    # KYRGYZ REGISTRATION
+    #
+    # Examples:
+    #   Бишкекте катталгам
+    #   Ошто катталгам
+    #   Нарында катталгам
+    #   Таласта катталгам
+    #   Баткенде катталгам
+    #   Чуйда катталгам
     # --------------------------------------------------------
 
-    patterns = [
+    kyrgyz_patterns = [
+        r"\b(бишкекте|ошто|нарында|таласта|баткенде|чуйда)\s+катталгам\b",
+        r"\b(бишкекте|ошто|нарында|таласта|баткенде|чуйда)\s+катталганмын\b",
+    ]
 
-        # Я зарегистрирован в Бишкеке
+    for pattern in kyrgyz_patterns:
+        match = re.search(
+            pattern,
+            text,
+            flags=re.IGNORECASE,
+        )
+
+        if match:
+            raw = match.group(1).lower()
+            normalized = regions.get(raw)
+
+            if normalized:
+                return normalized
+
+    # --------------------------------------------------------
+    # RUSSIAN REGISTRATION
+    #
+    # Examples:
+    #   Я зарегистрирован в Бишкеке
+    #   зарегистрирована в Бишкеке
+    #   прописан в Оше
+    # --------------------------------------------------------
+
+    russian_patterns = [
         r"(?:я\s+)?"
         r"(?:зарегистрирован|"
         r"зарегистрирована|"
@@ -1404,21 +1622,19 @@ def _extract_registration_region(
         r"([А-Яа-яЁёA-Za-z\- ]+?)"
         r"(?:[.!?,]|$)",
 
-        # Регистрация в Бишкеке
         r"(?:регистрация|"
         r"регион регистрации)"
         r"\s+(?:в|на территории)\s+"
         r"([А-Яа-яЁёA-Za-z\- ]+?)"
         r"(?:[.!?,]|$)",
 
-        # Регион: Нарын
         r"(?:регион|область|город)"
         r"\s*[:\-]\s*"
         r"([А-Яа-яЁёA-Za-z\- ]+?)"
         r"(?:[.!?,]|$)",
     ]
 
-    for pattern in patterns:
+    for pattern in russian_patterns:
 
         match = re.search(
             pattern,
@@ -1438,21 +1654,13 @@ def _extract_registration_region(
             flags=re.IGNORECASE,
         ).strip()
 
-        normalized = regions.get(
-            raw.lower()
-        )
+        normalized = regions.get(raw.lower())
 
         if normalized:
             return normalized
 
     # --------------------------------------------------------
     # BARE REGION ANSWER
-    #
-    # Examples:
-    #   Бишкек
-    #   Ош
-    #   Нарын
-    #   Чуйская область
     # --------------------------------------------------------
 
     bare = text.strip().lower()
