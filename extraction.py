@@ -599,26 +599,66 @@ def _extract_car_year(
 
     text = _clean_text(text)
 
-    pattern = (
+    # --------------------------------------------------------
+    # FULL YEARS
+    #
+    # Examples:
+    #   2021
+    #   2021 года
+    #   2021 год
+    #   2021 г.
+    #   2021-жылкы
+    # --------------------------------------------------------
+
+    full_year_pattern = (
         r"\b"
         r"(19\d{2}|20\d{2})"
         r"\s*"
-        r"(?:года|год|г\.)?"
+        r"(?:года|год|г\.|жылкы|жыл)?"
         r"\b"
     )
 
     for match in re.finditer(
-        pattern,
+        full_year_pattern,
         text,
         flags=re.IGNORECASE,
     ):
 
-        year = int(
-            match.group(1)
-        )
+        year = int(match.group(1))
 
         if 1980 <= year <= 2035:
             return year
+
+    # --------------------------------------------------------
+    # CONVERSATIONAL TWO-DIGIT YEARS
+    #
+    # Examples:
+    #   21 года
+    #   21-го года
+    #   21-й год
+    #   21 г.
+    #   21-жылкы
+    # --------------------------------------------------------
+
+    short_year_pattern = (
+        r"\b"
+        r"(\d{2})"
+        r"(?:-?го|-?й)?"
+        r"\s*"
+        r"(?:года|год|г\.|-?жылкы|-?жыл)"
+        r"(?=\s|$|[.!?,])"
+    )
+
+    for match in re.finditer(
+        short_year_pattern,
+        text,
+        flags=re.IGNORECASE,
+    ):
+
+        short_year = int(match.group(1))
+
+        if 0 <= short_year <= 35:
+            return 2000 + short_year
 
     return None
 
@@ -1171,6 +1211,36 @@ def _extract_car_model(
             flags=re.IGNORECASE,
         ).strip()
 
+        # Remove conversational two-digit year.
+        #
+        # Examples:
+        #   Камри 21 года
+        #   Камри 21-го года
+        #   Камри 21-й год
+        #   Камри 21 г.
+        #
+        model = re.sub(
+            r"\s+\d{2}"
+            r"(?:-?го|-?й)?"
+            r"\s*"
+            r"(?:года|год|г\.|жылкы|жыл)"
+            r"\s*$",
+            "",
+            model,
+            flags=re.IGNORECASE,
+        ).strip()
+
+        # Remove a short year left without its suffix.
+        # This can happen when punctuation separates the
+        # model and year.
+        model = re.sub(
+            r"\s+\d{2}(?:-?го|-?й)?\s*$",
+            "",
+            model,
+            flags=re.IGNORECASE,
+        ).strip()
+
+
         # Remove punctuation accidentally left before suffix.
         model = re.sub(
             r"\s*[-–—]\s*$",
@@ -1438,11 +1508,40 @@ def _extract_car_model(
             bare = cleaned.strip()
             break
 
-    # Remove year + Russian/Kyrgyz year suffix.
+    # Remove full year + Russian/Kyrgyz year suffix.
     bare = re.sub(
         r"\b(?:19\d{2}|20\d{2})"
         r"\s*[-–—]?\s*"
         r"(?:года|год|г\.?|жылкы|жыл)?\b",
+        "",
+        bare,
+        flags=re.IGNORECASE,
+    )
+
+    # Remove conversational two-digit vehicle years.
+    #
+    # Examples:
+    #   Toyota Camry 21 года  -> Toyota Camry
+    #   Камри 21-го года      -> Камри
+    #   Камри 21-й год        -> Камри
+    #   Камри 21 г.           -> Камри
+    #   Toyota Camry 21-жылкы -> Toyota Camry
+    #
+    # The year extractor separately converts these to 2021.
+    bare = re.sub(
+        r"\b\d{2}"
+        r"(?:-?го|-?й)?"
+        r"\s*"
+        r"(?:года|год|г\.|-?жылкы|-?жыл)"
+        r"(?=\s|$|[.!?,])",
+        "",
+        bare,
+        flags=re.IGNORECASE,
+    )
+
+    # Handle a remaining bare two-digit year at the end.
+    bare = re.sub(
+        r"\s+\d{2}(?:-?й)?\s*$",
         "",
         bare,
         flags=re.IGNORECASE,
