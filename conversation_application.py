@@ -657,9 +657,46 @@ def update_customer_from_information(
 
     if information["car_model"]:
 
-        customer.car_model = (
+        new_car_model = (
             information["car_model"]
-        )
+        ).strip()
+
+        existing_car_model = (
+            customer.car_model or ""
+        ).strip()
+
+        # -----------------------------------------------------
+        # CAR MODEL PARTIAL ANSWERS
+        #
+        # Example:
+        #   Customer: "Тойота"
+        #   Customer: "Камри"
+        #
+        # Result:
+        #   "Тойота Камри"
+        #
+        # Also supports:
+        #   "Toyota" + "Camry"
+        #
+        # Do not duplicate a model that is already complete.
+        # -----------------------------------------------------
+
+        if (
+            existing_car_model
+            and new_car_model
+            and existing_car_model.lower()
+                != new_car_model.lower()
+        ):
+
+            combined_model = (
+                f"{existing_car_model} {new_car_model}"
+            ).strip()
+
+            customer.car_model = combined_model
+
+        else:
+
+            customer.car_model = new_car_model
 
     # ---------------------------------------------------------
     # CAR YEAR
