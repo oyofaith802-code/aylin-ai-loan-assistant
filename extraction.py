@@ -1145,6 +1145,10 @@ def _extract_car_model(
 
     conversational_car_model_exclusions = [
 
+        # Loan program names are NEVER car models.
+        "автозалог",
+        "автозайм",
+
         # Kyrgyz vehicle possession
         "машинаны өзүмдө калтыргым келет",
         "машинамды өзүмдө калтыргым келет",
@@ -1198,6 +1202,69 @@ def _extract_car_model(
 
     lower_text = text.lower().strip()
 
+    # --------------------------------------------------------
+    # ORDINARY CONVERSATIONAL SENTENCES MUST NEVER
+    # BECOME CAR MODELS
+    # --------------------------------------------------------
+
+    conversational_sentence_patterns = [
+        r"^я\\s+же\\s+написал$",
+        r"^я\\s+же\\s+писал$",
+        r"^я\\s+же\\s+сказал$",
+        r"^я\\s+же\\s+говорил$",
+        r"^я\\s+уже\\s+написал$",
+        r"^я\\s+уже\\s+писал$",
+        r"^я\\s+уже\\s+сказал$",
+        r"^я\\s+уже\\s+говорил$",
+        r"^мы\\s+же\\s+написали$",
+        r"^мы\\s+уже\\s+написали$",
+        r"^я\\s+не\\s+знаю$",
+        r"^не\\s+знаю$",
+        r"^не\\s+понял$",
+        r"^не\\s+поняла$",
+        r"^понятно$",
+        r"^хорошо$",
+        r"^ладно$",
+        r"^ок$",
+        r"^окей$",
+        r"^да$",
+        r"^нет$",
+    ]
+
+    for pattern in conversational_sentence_patterns:
+        if re.fullmatch(
+            pattern,
+            lower_text,
+            flags=re.IGNORECASE,
+        ):
+            return None
+
+    # Common conversational phrases.
+    conversational_phrases = {
+        "я же написал",
+        "я же писала",
+        "я же написал вам",
+        "я же писала вам",
+        "я уже написал",
+        "я уже написала",
+        "я уже говорил",
+        "я уже говорила",
+        "я уже сказал",
+        "я уже сказала",
+        "я это уже написал",
+        "я это уже сказала",
+        "я это уже говорил",
+        "я это уже говорила",
+        "я вам уже написал",
+        "я вам уже написала",
+        "я вам уже говорил",
+        "я вам уже говорила",
+    }
+
+    if lower_text in conversational_phrases:
+        return None
+
+    # --------------------------------------------------------
     # Additional Kyrgyz loan-term conversational answers.
     # These must never be interpreted as car models.
     loan_term_patterns = [
