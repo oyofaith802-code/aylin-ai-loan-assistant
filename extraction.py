@@ -1380,6 +1380,56 @@ def _extract_car_model(
             return model
 
     # --------------------------------------------------------
+    # REGISTRATION LOCATION MUST NEVER BE A CAR MODEL
+    #
+    # Customers often answer the registration question briefly:
+    #   "Бишкек"
+    #   "в Бишкеке"
+    #   "Бостери"
+    #   "в Бостери"
+    #
+    # Registration extraction already handles these values.
+    # Therefore, stop car_model extraction from claiming them.
+    # --------------------------------------------------------
+
+    normalized_location = text.lower().strip(" .,!?;:")
+    normalized_location = re.sub(
+        r"^(?:в|на)\\s+",
+        "",
+        normalized_location,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    known_registration_locations = {
+        "бишкек",
+        "бишкеке",
+        "бишкекте",
+        "ош",
+        "оше",
+        "ошто",
+        "чуй",
+        "чуйда",
+        "иссык-куль",
+        "иссык куль",
+        "иссык-куле",
+        "нарын",
+        "нарына",
+        "нарында",
+        "талас",
+        "таласта",
+        "джалал-абад",
+        "джалал абад",
+        "баткен",
+        "баткенде",
+        "бостери",
+        "бостер",
+        "бостериде",
+    }
+
+    if normalized_location in known_registration_locations:
+        return None
+
+    # --------------------------------------------------------
     # BARE CUSTOMER ANSWER
     #
     # Examples:
@@ -1448,6 +1498,45 @@ def _extract_car_model(
     ])
 
     lower_text = text.lower().strip()
+
+    # --------------------------------------------------------
+    # REGISTRATION DIRECT-ANSWER GUARD
+    #
+    # A customer may answer the registration question with only
+    # a location, for example:
+    #
+    #   бостери
+    #   в бостери
+    #   бишкек
+    #   в бишкеке
+    #
+    # These are registration answers, NOT car models.
+    # --------------------------------------------------------
+
+    registration_answer_patterns = [
+        r"^в\\s+бостери$",
+        r"^бостери$",
+        r"^в\\s+бишкеке$",
+        r"^бишкек$",
+        r"^в\\s+ош(?:е)?$",
+        r"^ош$",
+        r"^в\\s+нарын(?:е)?$",
+        r"^нарын$",
+        r"^в\\s+талас(?:те)?$",
+        r"^талас$",
+        r"^в\\s+баткен(?:де)?$",
+        r"^баткен$",
+        r"^в\\s+чуй(?:да)?$",
+        r"^чуй$",
+    ]
+
+    for pattern in registration_answer_patterns:
+        if re.fullmatch(
+            pattern,
+            lower_text,
+            flags=re.IGNORECASE,
+        ):
+            return None
 
     # --------------------------------------------------------
     # REMOVE GREETING PREFIXES
@@ -1964,6 +2053,12 @@ def _extract_registration_region(
         "бишкеке": "Бишкек",
         "бишкекте": "Бишкек",
 
+        # Bosteri / Issyk-Kul
+        # Bosteri is a settlement in the Issyk-Kul area.
+        "бостери": "Иссык-Куль",
+        "бостериде": "Иссык-Куль",
+        "бостер": "Иссык-Куль",
+
         # Osh
         "ош": "Ош",
         "оше": "Ош",
@@ -2006,6 +2101,33 @@ def _extract_registration_region(
         "баткенде": "Баткен",
         "баткенская область": "Баткенская область",
     }
+
+    # --------------------------------------------------------
+    # DIRECT REGION / CITY ANSWERS
+    #
+    # Customers often answer the question with only:
+    #   Бишкек
+    #   в Бишкеке
+    #   Бостери
+    #   в Бостери
+    #
+    # These must be recognized as registration_region before
+    # generic extraction can mistake them for car_model.
+    # --------------------------------------------------------
+
+    direct_region = text.lower().strip(" .,!?;:")
+
+    direct_region = re.sub(
+        r"^(?:в|на)\s+",
+        "",
+        direct_region,
+        flags=re.IGNORECASE,
+    )
+
+    normalized_direct = regions.get(direct_region)
+
+    if normalized_direct:
+        return normalized_direct
 
     # --------------------------------------------------------
     # KYRGYZ REGISTRATION
