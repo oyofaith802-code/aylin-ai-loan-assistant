@@ -548,6 +548,33 @@ def _extract_loan_term(
         r"\bсрок\s*[:\-]?\s*(\d+)\b",
     ]
 
+    # --------------------------------------------------------
+    # RUSSIAN NATURAL YEAR EXPRESSIONS
+    # --------------------------------------------------------
+    #
+    # Examples:
+    #   на год
+    #   год
+    #   на один год
+    #   один год
+    #
+    # A loan term expressed as one year = 12 months.
+    # --------------------------------------------------------
+
+    if re.search(
+        r"\bна\s+(?:один\s+)?год\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return 12
+
+    if re.search(
+        r"\b(?:один\s+)?год\b",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        return 12
+
     if re.search(
         r"\bна\s+месяц\b",
         text,
