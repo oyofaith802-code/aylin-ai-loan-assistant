@@ -1932,6 +1932,8 @@ def _extract_vehicle_possession(
         "нужен без изъятия",
         "хочу без изъятия",
 
+        # Short direct customer answer
+        "без изъятия",
 
         # Whisper / speech-recognition variants
         "без из яйти машины",
